@@ -313,9 +313,37 @@ function registerSW() {
 // ── NOTIFICATIONS ──
 function checkNotifBanner() {
   if (!("Notification" in window)) return;
-  var dismissed = localStorage.getItem("notifDismissed");
-  if (Notification.permission === "default" && !dismissed) {
+
+  // If already granted — never show banner again
+  if (Notification.permission === "granted") {
+    document.getElementById("notifBanner").style.display = "none";
+    return;
+  }
+
+  // If browser blocked manually — show banner again (ignores dismiss)
+  if (Notification.permission === "denied") {
     document.getElementById("notifBanner").style.display = "flex";
+    document.querySelector(".btn-allow").textContent = "How to Enable";
+    document.querySelector(".btn-allow").onclick = function() {
+      alert("To enable notifications:\n1. Tap the 🔒 lock icon in address bar\n2. Tap Permissions\n3. Set Notifications to Allow\n4. Refresh the page");
+    };
+    return;
+  }
+
+  // Permission is "default" — check if dismissed recently
+  if (Notification.permission === "default") {
+    var dismissedAt = localStorage.getItem("notifDismissedAt");
+    if (!dismissedAt) {
+      // Never dismissed — show banner
+      document.getElementById("notifBanner").style.display = "flex";
+      return;
+    }
+    var daysSince = (Date.now() - parseInt(dismissedAt)) / (1000 * 60 * 60 * 24);
+    if (daysSince >= 3) {
+      // Dismissed 3+ days ago — show again
+      localStorage.removeItem("notifDismissedAt");
+      document.getElementById("notifBanner").style.display = "flex";
+    }
   }
 }
 
@@ -324,17 +352,24 @@ function askNotifPermission() {
   Notification.requestPermission().then(function(p) {
     document.getElementById("notifBanner").style.display = "none";
     if (p === "granted") {
+      // Clear any dismiss records — permanently enabled
+      localStorage.removeItem("notifDismissedAt");
+      localStorage.removeItem("notifDismissed");
+      localStorage.setItem("notifEnabled", "true");
       showToast("🔔 Notifications enabled! You'll get daily reminders.");
       fireRevisionNotification();
-    } else {
-      showToast("Notifications blocked. Enable from browser settings.");
+    } else if (p === "denied") {
+      // Browser blocked — show instructions
+      showToast("Blocked! Tap lock icon in address bar to enable manually.");
     }
   });
 }
 
 function dismissBanner() {
   document.getElementById("notifBanner").style.display = "none";
-  localStorage.setItem("notifDismissed", "true");
+  localStorage.setItem("notifDismissedAt", Date.now().toString());
+  // Remove old key if exists
+  localStorage.removeItem("notifDismissed");
 }
 
 function fireRevisionNotification() {
