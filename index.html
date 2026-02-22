@@ -80,8 +80,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-ap
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .header-left h1{font-size:1.2rem;font-weight:700;color:var(--indigo);}
 .header-left .greeting{color:var(--text2);font-size:0.75rem;margin-top:1px;}
-.header-right{display:flex;align-items:center;gap:10px;}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .streak-pill{background:var(--bg4);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:0.78rem;font-weight:600;color:var(--yellow);display:flex;align-items:center;gap:4px;}
+.coin-pill{color:#fbbf24;}
 .exam-pill{background:var(--bg4);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:0.78rem;color:var(--purple);display:flex;align-items:center;gap:4px;}
 
 /* ── TABS ── */
@@ -303,6 +304,7 @@ main{max-width:1100px;margin:0 auto;padding:12px;display:flex;flex-direction:col
     </div>
     <div class="header-right">
       <div class="streak-pill" id="streakPill">🔥 0</div>
+      <div class="streak-pill coin-pill" id="coinPill">🪙 0</div>
       <div class="exam-pill" id="examPill" style="display:none">📅 <span id="examDays">-</span>d</div>
     </div>
   </div>
@@ -486,10 +488,20 @@ let subjects  = JSON.parse(localStorage.getItem("st_subjects"))  || [...DEFAULT_
 let profile   = JSON.parse(localStorage.getItem("st_profile"))   || null;
 let streak    = JSON.parse(localStorage.getItem("st_streak"))    || {count:0, lastDate:""};
 let weeklyLog = JSON.parse(localStorage.getItem("st_weekly"))    || {};
+let coins     = parseInt(localStorage.getItem("st_coins") || "0", 10);
 let currentFilter = "all";
 let groupCode = localStorage.getItem("st_group") || "";
 let groupName = localStorage.getItem("st_grpname") || "";
 let lbUnsubscribe = null;
+
+let activityUnsubscribe = null;
+
+// Stable unique member ID per device/profile for group doc identity
+let memberId = localStorage.getItem("st_memberId") || "";
+if(!memberId){
+  memberId = Math.random().toString(36).slice(2,9) + Date.now().toString(36);
+  localStorage.setItem("st_memberId", memberId);
+}
 
 // ── HELPERS ──
 function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36); }
@@ -517,6 +529,132 @@ function save(){
   localStorage.setItem("st_subjects",JSON.stringify(subjects));
   localStorage.setItem("st_streak",JSON.stringify(streak));
   localStorage.setItem("st_weekly",JSON.stringify(weeklyLog));
+  localStorage.setItem("st_coins", String(coins || 0));
+}
+
+// ── SOUND FX (mobile-friendly) ──
+let audioCtx = null;
+let soundUnlocked = false;
+
+function getAudioCtx(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }catch(e){ return null; }
+}
+
+function unlockSound(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  if(ctx.state === "suspended"){
+    ctx.resume().then(()=>{ soundUnlocked = true; }).catch(()=>{});
+  } else {
+    soundUnlocked = true;
+  }
+}
+
+function primeSound(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.00001;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.01);
+  }catch(e){}
+}
+
+function beep(freq=660, dur=0.1, type="sine", vol=0.08){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  if(ctx.state === "suspended") return; // avoid silent fail on phones
+  try{
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + dur + 0.03);
+  }catch(e){}
+}
+
+function playSaveSound(){
+  beep(540,0.07,"triangle",0.07);
+  setTimeout(()=>beep(700,0.09,"triangle",0.06),70);
+}
+function playDoneSound(){
+  beep(720,0.08,"sine",0.08);
+  setTimeout(()=>beep(920,0.11,"sine",0.07),90);
+}
+function playCoinSound(){
+  beep(900,0.06,"triangle",0.07);
+  setTimeout(()=>beep(1200,0.07,"triangle",0.06),65);
+  setTimeout(()=>beep(1500,0.10,"triangle",0.06),130);
+}
+function playClickSound(){
+  // soft UI tap
+  beep(620, 0.025, "sine", 0.025);
+  setTimeout(()=>beep(780, 0.03, "sine", 0.018), 20);
+}
+
+function playDeleteSound(){
+  // gentle downward remove sound
+  beep(520, 0.05, "triangle", 0.045);
+  setTimeout(()=>beep(390, 0.06, "sawtooth", 0.04), 50);
+  setTimeout(()=>beep(280, 0.07, "sawtooth", 0.03), 110);
+}
+
+function playCopySound(){
+  // tiny sparkle
+  beep(900, 0.03, "triangle", 0.03);
+  setTimeout(()=>beep(1200, 0.035, "triangle", 0.025), 28);
+}
+
+function playGroupCreateSound(){
+  // short celebration
+  beep(660, 0.05, "triangle", 0.04);
+  setTimeout(()=>beep(880, 0.06, "triangle", 0.035), 45);
+  setTimeout(()=>beep(1100,0.07, "sine", 0.03), 95);
+}
+
+function playGroupJoinSound(){
+  // connected feel
+  beep(540, 0.04, "sine", 0.03);
+  setTimeout(()=>beep(720, 0.05, "triangle", 0.03), 40);
+  setTimeout(()=>beep(960, 0.05, "triangle", 0.025), 85);
+}
+
+function playLeaveGroupSound(){
+  // softer exit
+  beep(500, 0.04, "triangle", 0.035);
+  setTimeout(()=>beep(420, 0.05, "triangle", 0.03), 45);
+  setTimeout(()=>beep(320, 0.06, "sine", 0.025), 95);
+}
+
+function playErrorSound(){
+  // optional error tone
+  beep(340, 0.05, "square", 0.03);
+  setTimeout(()=>beep(300, 0.07, "square", 0.025), 55);
+}
+// ── COINS ──
+function coinForOffset(dayOffset){
+  if(dayOffset===1) return 5;
+  if(dayOffset===3) return 10;
+  if(dayOffset===7) return 15;
+  if(dayOffset>=20) return 20; // your 30-day final revision gets 20 coins
+  return 0;
+}
+function updateCoinsUI(){
+  const pill = document.getElementById("coinPill");
+  if(pill) pill.textContent = "🪙 " + (coins || 0);
 }
 
 // ── TOAST ──
@@ -533,7 +671,7 @@ function registerSW(){
   if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
 
-// ── NOTIFICATIONS ──
+// ── NOTIFICATIONS ── (kept as-is, per your request)
 function checkNotifBanner(){
   if(!("Notification" in window)) return;
   if(Notification.permission==="granted"){ document.getElementById("notifBanner").style.display="none"; return; }
@@ -693,6 +831,7 @@ function addCustomSubject(){
   subjects.push(val); save(); populateSubjectDropdown();
   document.getElementById("subjectSelect").value=val;
   input.value="";
+  playSaveSound();
   showToast("Subject added!");
 }
 
@@ -711,6 +850,7 @@ function addChapter(){
   document.getElementById("chapterStatus").value="Not Started";
   document.getElementById("weakToggle").checked=false;
   document.getElementById("weakLabel").textContent="No";
+  playSaveSound();
   showToast("Chapter saved! 📚");
   switchTabByName("today");
   pushGroupUpdate();
@@ -720,7 +860,11 @@ function switchTabByName(name){
   document.querySelectorAll(".tab-content").forEach(t=>t.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
   document.getElementById("tab-"+name).classList.add("active");
-  document.querySelector(`.tab-btn[onclick="switchTab('${name}')"]`)?.classList.add("active");
+  // Fix for your original selector bug:
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    const attr = btn.getAttribute("onclick") || "";
+    if(attr.includes(`'${name}'`)) btn.classList.add("active");
+  });
 }
 
 // ── REVISIONS ──
@@ -731,24 +875,40 @@ function generateRevisions(chapter){
 }
 function markRevDone(id){
   const rev=revisions.find(r=>r.id===id);
-  if(rev){
-    rev.done=true;
-    weeklyLog[todayStr()]=(weeklyLog[todayStr()]||0)+1;
-    save(); updateStreak(); renderAll();
-    showToast("Revision done! ✅");
-    pushGroupUpdate();
-    checkGroupMilestone();
+  if(!rev) return;
+  if(rev.done) return; // prevent double-tap double rewards
+
+  rev.done=true;
+
+  const earned = coinForOffset(rev.dayOffset);
+  if(earned>0){
+    coins = (coins || 0) + earned;
   }
+
+  weeklyLog[todayStr()] = (weeklyLog[todayStr()]||0) + 1;
+
+  save();
+  updateStreak();
+  renderAll();
+
+  playDoneSound();
+  if(earned>0) setTimeout(playCoinSound, 90);
+
+  showToast(earned>0 ? `Revision done! ✅ +${earned}🪙` : "Revision done! ✅");
+  pushGroupUpdate();
+  checkGroupMilestone();
 }
 function deleteRevision(id){
   revisions=revisions.filter(r=>r.id!==id);
   save(); renderAll();
+  playDeleteSound();
 }
 function deleteChapter(id){
   if(!confirm("Delete this chapter and all its revisions?")) return;
   chapters=chapters.filter(c=>c.id!==id);
   revisions=revisions.filter(r=>r.chapterId!==id);
   save(); renderAll();
+  playDeleteSound();
   showToast("Chapter deleted.");
 }
 function updateStatus(id,newStatus){
@@ -761,6 +921,7 @@ function updateStatus(id,newStatus){
     ch.dateAdded=todayStr();
     revisions=revisions.filter(r=>r.chapterId!==id);
     generateRevisions(ch);
+    playSaveSound();
     showToast("Revision schedule set! 📅");
     pushGroupUpdate();
     checkGroupMilestone();
@@ -800,7 +961,7 @@ function renderTodayRevisions(){
     const revs=groups[subject]; let rows="";
     revs.forEach(r=>{
       rows+=`<div class="rev-row">
-        <div style="flex:1;min-width:0"><p>${r.chapterName}</p><span>+${r.dayOffset} day revision</span></div>
+        <div style="flex:1;min-width:0"><p>${r.chapterName}</p><span>+${r.dayOffset} day revision · Reward ${coinForOffset(r.dayOffset)}🪙</span></div>
         <div class="rev-actions">
           <button class="btn btn-success btn-sm" onclick="markRevDone('${r.id}')">✓ Done</button>
           <button class="btn btn-danger btn-sm" onclick="deleteRevision('${r.id}')">🗑</button>
@@ -823,7 +984,7 @@ function renderDoneRevisions(){
     const revs=groups[subject]; let items="";
     revs.forEach(r=>{
       items+=`<div class="done-item">
-        <div class="info"><div class="name">${r.chapterName}</div><div class="meta">+${r.dayOffset} day · ${fmtDate(r.dueDate)}</div></div>
+        <div class="info"><div class="name">${r.chapterName}</div><div class="meta">+${r.dayOffset} day · ${fmtDate(r.dueDate)} · +${coinForOffset(r.dayOffset)}🪙</div></div>
         <button class="btn btn-danger btn-xs" onclick="deleteRevision('${r.id}')">🗑</button>
       </div>`;
     });
@@ -843,7 +1004,7 @@ function renderCalendar(){
   let html="";
   Object.keys(byDate).forEach(date=>{
     const revs=byDate[date]; let chips="";
-    revs.forEach(r=>{ chips+=`<div class="cal-chip"><p class="chip-name">${r.chapterName}</p><p class="chip-meta">${r.subject} +${r.dayOffset}d</p></div>`; });
+    revs.forEach(r=>{ chips+=`<div class="cal-chip"><p class="chip-name">${r.chapterName}</p><p class="chip-meta">${r.subject} +${r.dayOffset}d · ${coinForOffset(r.dayOffset)}🪙</p></div>`; });
     html+=`<div class="cal-day">
       <div class="cal-day-header">
         <div><p class="cal-date">${fmtDate(date)}</p><p class="cal-relative">${daysFromToday(date)}</p></div>
@@ -908,7 +1069,6 @@ function chapterCard(ch){
   }
   const weakBadge=ch.isWeak?`<span class="weak-badge">⚠ Weak</span>`:"";
 
-  // Revision dots
   let dots="";
   [1,3,7,30].forEach(n=>{
     const rev=revisions.find(r=>r.chapterId===ch.id&&r.dayOffset===n);
@@ -944,7 +1104,7 @@ function showNotifModal(){
   let html="";
   due.forEach(r=>{
     html+=`<li class="notif-item">
-      <div><p class="nname">${r.chapterName}</p><p class="nsub">${r.subject} · +${r.dayOffset} day</p></div>
+      <div><p class="nname">${r.chapterName}</p><p class="nsub">${r.subject} · +${r.dayOffset} day · ${coinForOffset(r.dayOffset)}🪙</p></div>
       <span class="ntag">Due Today</span>
     </li>`;
   });
@@ -971,6 +1131,7 @@ async function createGroup(){
   localStorage.setItem("st_grpname",name);
   await pushGroupUpdate(true);
   renderGroup();
+  playGroupCreateSound();
   showToast("Group created! Code: "+code);
 }
 
@@ -982,58 +1143,84 @@ async function joinGroup(){
   const name=document.getElementById("grp-name").value.trim();
   const code=document.getElementById("grp-code-input").value.trim().toUpperCase();
   if(!name){ showToast("Enter your display name!","error"); return; }
-  if(code.length!==6){ showToast("Enter a valid 6-digit code!","error"); return; }
+  if(code.length!==6){ showToast("Enter a valid 6-character code!","error"); return; }
   groupCode=code;
   groupName=name;
   localStorage.setItem("st_group",code);
   localStorage.setItem("st_grpname",name);
   await pushGroupUpdate(true);
   renderGroup();
+ playGroupJoinSound();
   showToast("Joined group "+code+"!");
 }
 
-function leaveGroup(){
+async function leaveGroup(){
   if(!confirm("Leave this group? Your local data stays safe.")) return;
-  if(lbUnsubscribe) lbUnsubscribe();
+
+  if(lbUnsubscribe){ lbUnsubscribe(); lbUnsubscribe = null; }
+  if(activityUnsubscribe){ activityUnsubscribe(); activityUnsubscribe = null; }
+
+  // Remove this device/user from Firestore so others see real-time removal
+  try{
+    if(groupCode && db && memberId){
+      await db.collection("groups").doc(groupCode)
+        .collection("members").doc(memberId).delete();
+    }
+  }catch(e){
+    console.log("Leave group delete error:", e);
+  }
+
   groupCode="";
   groupName="";
   localStorage.removeItem("st_group");
   localStorage.removeItem("st_grpname");
   document.getElementById("groupMain").style.display="none";
   document.getElementById("groupSetup").style.display="block";
+ playLeaveGroupSound();
   showToast("Left the group.");
 }
-
 function copyGroupCode(){
-  navigator.clipboard.writeText(groupCode).then(()=>showToast("Code copied! 📋"));
+  navigator.clipboard.writeText(groupCode)
+    .then(()=>{
+     playCopySound();
+      showToast("Code copied! 📋");
+    })
+    .catch(()=>showToast("Couldn't copy code","error"));
 }
 
 async function pushGroupUpdate(isJoin){
-  if(!groupCode || !db) return;
+  if(!groupCode || !db || !memberId) return;
   const t=todayStr();
-  const completedToday=chapters.filter(c=>c.status==="Completed").length;
+
+  // keeping your original metric behavior (completedChapters is total completed, not "today")
+  const completedCount=chapters.filter(c=>c.status==="Completed").length;
   const revisDoneToday=revisions.filter(r=>r.dueDate===t&&r.done).length;
   const totalRevDone=revisions.filter(r=>r.done).length;
 
   try {
     await db.collection("groups").doc(groupCode)
-      .collection("members").doc(groupName)
+      .collection("members").doc(memberId)
       .set({
-        name: groupName,
+        memberId,
+        displayName: groupName,
+        name: groupName, // backward compatibility with older docs
         streak: streak.count,
-        completedChapters: completedToday,
+        coins: coins || 0,
+        completedChapters: completedCount,
         revisionsDoneToday: revisDoneToday,
         totalRevisions: totalRevDone,
         lastSeen: t,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      }, { merge:true });
 
-    // Log activity
+    // Log activity (skip on join)
     if(!isJoin){
       const activity={
+        memberId,
         member: groupName,
+        coins: coins || 0,
         revisDoneToday,
-        completedChapters: completedToday,
+        completedChapters: completedCount,
         date: t,
         ts: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -1046,11 +1233,11 @@ async function pushGroupUpdate(isJoin){
 async function checkGroupMilestone(){
   if(!groupCode || !db) return;
   const completed=chapters.filter(c=>c.status==="Completed").length;
-  // Notify group at milestones: 5,10,15,20...
-  if(completed>0&&completed%5===0){
+  if(completed>0 && completed%5===0){
     try {
       await db.collection("groups").doc(groupCode)
         .collection("milestones").add({
+          memberId,
           member: groupName,
           milestone: completed+" chapters completed!",
           date: todayStr(),
@@ -1068,7 +1255,6 @@ function renderGroup(){
     if(savedName) document.getElementById("grp-name").value=savedName;
     return;
   }
-  // Show group main UI
   document.getElementById("groupSetup").style.display="none";
   document.getElementById("groupMain").style.display="block";
   document.getElementById("groupCodeDisplay").textContent=groupCode;
@@ -1076,23 +1262,40 @@ function renderGroup(){
   loadActivity();
 }
 
-function loadLeaderboard(){ if(!db) { document.getElementById("leaderboard").innerHTML="<div class=\"empty\"><p>Group feature requires internet.</p></div>"; return; }
+function loadLeaderboard(){
+  if(!db) {
+    document.getElementById("leaderboard").innerHTML='<div class="empty"><p>Group feature requires internet.</p></div>';
+    return;
+  }
   if(lbUnsubscribe) lbUnsubscribe();
-  lbUnsubscribe=db.collection("groups").doc(groupCode)
+
+  lbUnsubscribe = db.collection("groups").doc(groupCode)
     .collection("members")
     .onSnapshot(snap=>{
       const members=[];
-      snap.forEach(doc=>members.push(doc.data()));
-      members.sort((a,b)=>(b.totalRevisions||0)-(a.totalRevisions||0));
+      snap.forEach(doc=>{
+        const d = doc.data() || {};
+        members.push({ id: doc.id, ...d });
+      });
+
+      // Sort by coins DESC, then revisions DESC
+      members.sort((a,b)=>{
+        const coinDiff = (b.coins||0) - (a.coins||0);
+        if(coinDiff!==0) return coinDiff;
+        return (b.totalRevisions||0) - (a.totalRevisions||0);
+      });
+
       const medals=["🥇","🥈","🥉"];
       let html="";
       members.forEach((m,i)=>{
-        const isYou=m.name===groupName;
-        html+=`<div class="lb-card${isYou?" lb-you":""}">
+        const isYou = (m.id === memberId);
+        const display = m.displayName || m.name || "Member";
+        html += `<div class="lb-card${isYou?" lb-you":""}">
           <div class="lb-rank">${medals[i]||"#"+(i+1)}</div>
           <div class="lb-info">
-            <div class="lb-name">${m.name}${isYou?" (You)":""}</div>
+            <div class="lb-name">${display}${isYou?" (You)":""}</div>
             <div class="lb-stats">
+              <span class="lb-stat">🪙 <span>${m.coins||0}</span> coins</span>
               <span class="lb-stat">🔥 <span>${m.streak||0}</span> streak</span>
               <span class="lb-stat">✅ <span>${m.totalRevisions||0}</span> revisions</span>
               <span class="lb-stat">📚 <span>${m.completedChapters||0}</span> chapters</span>
@@ -1100,36 +1303,49 @@ function loadLeaderboard(){ if(!db) { document.getElementById("leaderboard").inn
           </div>
         </div>`;
       });
+
       if(!html) html='<div class="empty"><div class="emoji">👥</div><p>No members yet. Share your group code!</p></div>';
       document.getElementById("leaderboard").innerHTML=html;
+    }, err=>{
+      console.log("Leaderboard listener error:", err);
+      document.getElementById("leaderboard").innerHTML='<div class="empty"><p>Could not load leaderboard.</p></div>';
     });
 }
 
-async function loadActivity(){ if(!db) { document.getElementById("activityFeed").innerHTML="<div class=\"empty\"><p>Activity requires internet.</p></div>"; return; }
-  const t=todayStr();
-  try {
-    const snap=await db.collection("groups").doc(groupCode)
-      .collection("activity")
-      .where("date","==",t)
-      
-      .limit(10)
-      .get();
-    let html="";
-    snap.forEach(doc=>{
-      const d=doc.data();
-      html+=`<div class="activity-item">
-        <div class="activity-dot"></div>
-        <div>
-          <div class="activity-text"><strong>${d.member}</strong> completed ${d.revisDoneToday} revision${d.revisDoneToday!==1?"s":""} today · ${d.completedChapters} chapters total</div>
-          <div class="activity-time">Today</div>
-        </div>
-      </div>`;
-    });
-    if(!html) html='<div class="empty"><div class="emoji">⚡</div><p>No activity today yet. Be the first!</p></div>';
-    document.getElementById("activityFeed").innerHTML=html;
-  } catch(e){
-    document.getElementById("activityFeed").innerHTML='<div class="empty"><p>Activity loading...</p></div>';
+// real-time activity listener
+function loadActivity(){
+  if(!db) {
+    document.getElementById("activityFeed").innerHTML='<div class="empty"><p>Activity requires internet.</p></div>';
+    return;
   }
+  const t=todayStr();
+
+  if(activityUnsubscribe) activityUnsubscribe();
+
+  activityUnsubscribe = db.collection("groups").doc(groupCode)
+    .collection("activity")
+    .where("date","==",t)
+    .orderBy("ts","desc")
+    .limit(20)
+    .onSnapshot(snap=>{
+      let html="";
+      snap.forEach(doc=>{
+        const d=doc.data()||{};
+        const name = d.member || "Member";
+        html += `<div class="activity-item">
+          <div class="activity-dot"></div>
+          <div>
+            <div class="activity-text"><strong>${name}</strong> completed ${d.revisDoneToday||0} revision${(d.revisDoneToday||0)!==1?"s":""} today · ${(d.completedChapters||0)} chapters total · ${(d.coins||0)}🪙</div>
+            <div class="activity-time">Today</div>
+          </div>
+        </div>`;
+      });
+      if(!html) html='<div class="empty"><div class="emoji">⚡</div><p>No activity today yet. Be the first!</p></div>';
+      document.getElementById("activityFeed").innerHTML=html;
+    }, err=>{
+      console.log("Activity listener error:", err);
+      document.getElementById("activityFeed").innerHTML='<div class="empty"><p>Activity loading...</p></div>';
+    });
 }
 
 // ── RENDER ALL ──
@@ -1143,6 +1359,7 @@ function renderAll(){
   updateStreak();
   updateExamCountdown();
   logTodayActivity();
+  updateCoinsUI();
 }
 
 // ── TOGGLE WEAK ──
@@ -1159,13 +1376,23 @@ function initApp(){
   checkNotifBanner();
   scheduleDailyReminder();
   if(groupCode) renderGroup();
+  // keep group stats fresh if user already in group
+  pushGroupUpdate(true);
 }
 
 function init(){
   if(!checkOnboard()) return;
   initApp();
 }
+document.addEventListener("click", function onceUnlock(){
+  unlockSound();
+  primeSound();
+}, { once:true });
 
+document.addEventListener("touchstart", function onceUnlockTouch(){
+  unlockSound();
+  primeSound();
+}, { once:true });
 init();
 </script>
 </body>
