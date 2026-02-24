@@ -390,13 +390,14 @@ const IST_TZ = "Asia/Kolkata";
           setTimeout(() => { pill.style.transform = "scale(1)"; }, 150);
         }, 620);
       }
-      // ── TOAST ──
-      function showToast(msg, type) {
+     // ── TOAST ──
+      function showToast(main, type, sub) {
         const t = document.getElementById("toast");
-        t.textContent = msg;
         t.className = "toast" + (type ? " " + type : "");
+        t.innerHTML = `<div class="toast-main">${main}</div>${sub ? `<div class="toast-sub">${sub}</div>` : ""}`;
         t.classList.remove("hidden");
-        setTimeout(() => t.classList.add("hidden"), 2800);
+        clearTimeout(t._hideTimer);
+        t._hideTimer = setTimeout(() => t.classList.add("hidden"), 3200);
       }
 
       // ── SERVICE WORKER ──
@@ -441,10 +442,18 @@ const IST_TZ = "Asia/Kolkata";
           if (p === "granted") {
             localStorage.removeItem("notifDismissedAt");
             localStorage.setItem("notifEnabled", "true");
-            showToast("🔔 Notifications enabled!");
+           showToast(
+             "Utho Parth! 🏹🚩",
+             "",
+             "Aaj revision ka yuddh ladna hai. Notifications on!",
+           );
             fireNotification();
           } else {
-            showToast("Blocked! Enable from browser settings.", "error");
+        showToast(
+          "Notifications block ho gayi! 🚫🔔",
+          "error",
+          "Browser settings se enable karo.",
+        );
           }
         });
       }
@@ -503,7 +512,11 @@ const IST_TZ = "Asia/Kolkata";
       function finishOnboard() {
         const name = document.getElementById("ob-name").value.trim();
         if (!name) {
-          showToast("Please enter your name!", "error");
+        showToast(
+          "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+          "error",
+          "Pehle apna naam likho.",
+        );
           return;
         }
         const cls = document.getElementById("ob-class").value;
@@ -634,12 +647,20 @@ const IST_TZ = "Asia/Kolkata";
       function addCustomSubject() {
         const input = document.getElementById("customSubject");
         const val = input.value.trim();
-        if (!val) {
-          showToast("Enter a subject name!", "error");
-          return;
-        }
+       if (!val) {
+         showToast(
+           "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+           "error",
+           "Pehle subject ka naam likho.",
+         );
+         return;
+       }
         if (subjects.includes(val)) {
-          showToast("Subject already exists!", "error");
+        showToast(
+          "Bhai, ek hi cheez kitni baar padhoge? 😵‍💫🔁",
+          "error",
+          "Ye subject pehle se hai!",
+        );
           return;
         }
         subjects.push(val);
@@ -648,7 +669,11 @@ const IST_TZ = "Asia/Kolkata";
         document.getElementById("subjectSelect").value = val;
  input.value = "";
         playSaveSound();
-        showToast("Subject added!");
+      showToast(
+        "Ek aur dukh pal liya? 📚🤯",
+        "",
+        "Chalo, naya subject add ho gaya!",
+      );
       }
 
       // ── ADD CHAPTER ──
@@ -657,10 +682,14 @@ const IST_TZ = "Asia/Kolkata";
         const name = document.getElementById("chapterName").value.trim();
         const status = document.getElementById("chapterStatus").value;
         const isWeak = document.getElementById("weakToggle").checked;
-        if (!name) {
-          showToast("Enter a chapter name!", "error");
-          return;
-        }
+   if (!name) {
+     showToast(
+       "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+       "error",
+       "Chapter ka naam toh likho bhai.",
+     );
+     return;
+   }
         const chapter = {
           id: uid(),
           subject,
@@ -678,7 +707,11 @@ const IST_TZ = "Asia/Kolkata";
         document.getElementById("weakToggle").checked = false;
         document.getElementById("weakLabel").textContent = "No";
         playSaveSound();
-        showToast("Chapter saved! 📚");
+       showToast(
+         "Chapter save ho gaya! ✍️😏",
+         "",
+         "Ab bas padhai shuru karne ki der hai.",
+       );
         switchTabByName("today");
         pushGroupUpdate();
       }
@@ -740,9 +773,13 @@ const IST_TZ = "Asia/Kolkata";
           }
         }
 
-        showToast(
-          earned > 0 ? `Revision done! ✅ +${earned}🪙` : "Revision done! ✅",
-        );
+      showToast(
+        `Shabash sher! 🦁💰`,
+        "",
+        earned > 0
+          ? `Teri mehnat ke +${earned}🪙 mil gaye. Party kab hai?`
+          : "Revision done! Agli baar coins bhi milenge.",
+      );
         pushGroupUpdate();
         checkGroupMilestone();
       }
@@ -760,7 +797,11 @@ const IST_TZ = "Asia/Kolkata";
         save();
         renderAll();
         playDeleteSound();
-        showToast("Chapter deleted.");
+      showToast(
+        "Gaya kaam se! 🚮💨",
+        "",
+        "Jaise exam ke baad sab bhool jate ho.",
+      );
       }
       function updateStatus(id, newStatus) {
         const ch = chapters.find((c) => c.id === id);
@@ -775,13 +816,21 @@ const IST_TZ = "Asia/Kolkata";
           generateRevisions(ch);
           ch.dateAdded = tempDate;
           playSaveSound();
-          showToast("Revision schedule set! 📅");
+         showToast(
+           "Oho! Aag laga di. 🔥📅",
+           "",
+           "Revision ka schedule set kar diya hai.",
+         );
           pushGroupUpdate();
           checkGroupMilestone();
         }
    if (!nowCompleted && wasCompleted) {
           revisions = revisions.filter((r) => r.chapterId !== id);
-          showToast("Revisions cleared.");
+         showToast(
+           "Aalas ki bhi seema hoti hai! 🧹😴",
+           "",
+           "Revision schedule saaf kar diya.",
+         );
           pushGroupUpdate();
         }
         save();
@@ -1068,12 +1117,20 @@ items += `<div class="done-item">
       }
 async function createGroup() {
         if (groupCode) {
-          showToast("Leave your current group first!", "error");
+          showToast(
+            "Ek group kaafi nahi tha kya? 😏",
+            "error",
+            "Pehle current group chhodo.",
+          );
           return;
         }
         const name = document.getElementById("grp-name").value.trim();
         if (!name) {
-          showToast("Enter your display name!", "error");
+          showToast(
+            "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+            "error",
+            "Group mein dikhne ke liye naam chahiye.",
+          );
           return;
         }
         const grpNameVal = document.getElementById("grp-groupname").value.trim() || name + "'s Group";
@@ -1098,7 +1155,11 @@ async function createGroup() {
         await pushGroupUpdate(true);
         renderGroup();
         playGroupCreateSound();
-        showToast("Group created! Code: " + code);
+      showToast(
+        "Apna ilaaka ban gaya! 🏰😎",
+        "",
+        "Code: " + code + " — doston ko fansao.",
+      );
       }
 function showJoinGroup() {
         document.getElementById("joinGroupPanel").style.display = "block";
@@ -1110,25 +1171,41 @@ function showJoinGroup() {
       }
 
  async function joinGroup() {
-        if (groupCode) {
-          showToast("Leave your current group first!", "error");
-          return;
-        }
+     if (groupCode) {
+       showToast(
+         "Ek group kaafi nahi tha kya? 😏",
+         "error",
+         "Pehle current group chhodo.",
+       );
+       return;
+     }
         const name = document.getElementById("grp-name").value.trim();
         const code = document
           .getElementById("grp-code-input")
           .value.trim()
           .toUpperCase();
-        if (!name) {
-          showToast("Enter your display name!", "error");
-          return;
-        }
+      if (!name) {
+        showToast(
+          "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+          "error",
+          "Group mein dikhne ke liye naam chahiye.",
+        );
+        return;
+      }
         if (code.length !== 6) {
-          showToast("Enter a valid 6-character code!", "error");
+         showToast(
+           "Galat code! Kya jasusi karne ka irada hai? 🕵️‍♂️❌",
+           "error",
+           "6 character ka sahi code daalo.",
+         );
           return;
         }
         if (!db) {
-          showToast("Cannot connect to server.", "error");
+         showToast(
+           "Internet ne saath chhod diya! 📶😭",
+           "error",
+           "Jaise exam mein dimaag chhodta hai. Try karo.",
+         );
           return;
         }
         showToast("Checking code…", "info");
@@ -1140,11 +1217,19 @@ function showJoinGroup() {
             .limit(1)
             .get();
           if (snap.empty) {
-            showToast("No group found with that code. Check and try again.", "error");
+        showToast(
+          "Galat code! Kya jasusi karne ka irada hai? 🕵️‍♂️❌",
+          "error",
+          "Koi group nahi mila. Code check karo.",
+        );
             return;
           }
         } catch (e) {
-          showToast("Error checking group. Try again.", "error");
+          showToast(
+            "Internet ne saath chhod diya! 📶😭",
+            "error",
+            "Group check nahi ho paya. Dobara try karo.",
+          );
           return;
         }
        groupCode = code;
@@ -1165,7 +1250,11 @@ function showJoinGroup() {
         await pushGroupUpdate(true);
         renderGroup();
         playGroupJoinSound();
-        showToast("Joined group " + code + "!");
+       showToast(
+         "Swagat hai! 🤝🥳",
+         "",
+         "Ab akele fail nahi hoge, group mein maza aayega.",
+       );
       }
 
       async function leaveGroup() {
@@ -1209,14 +1298,22 @@ groupCode = "";
         document.getElementById("joinGroupPanel").style.display = "none";
         document.getElementById("grp-groupname-field").style.display = "flex";
         playLeaveGroupSound();
-        showToast("Left the group.");
+       showToast(
+         "Akela rahi... 🚶‍♂️💔",
+         "",
+         "Group chhod diya par padhai mat chhodna!",
+       );
       }
       function copyGroupCode() {
         navigator.clipboard
           .writeText(groupCode)
           .then(() => {
             playCopySound();
-            showToast("Code copied! 📋");
+         showToast(
+           "Code copy ho gaya! 📋✨",
+           "",
+           "Ab bas gyaan baantna baaki hai.",
+         );
           })
           .catch(() => showToast("Couldn't copy code", "error"));
       }
@@ -1313,18 +1410,36 @@ groupCode = "";
         if (!isCreator || !groupCode || !db) return;
         const inp = document.getElementById("rename-grp-input");
         const newName = inp ? inp.value.trim() : "";
-        if (!newName) { showToast("Enter a group name!", "error"); return; }
+     if (!newName) {
+       showToast(
+         "Naam toh do bhai! 😤🚫",
+         "error",
+         "Group ka naya naam likho.",
+       );
+       return;
+     }
         try {
-          await db.collection("groups").doc(groupCode).update({ groupName: newName });
+          await db
+            .collection("groups")
+            .doc(groupCode)
+            .update({ groupName: newName });
           groupDisplayName = newName;
           localStorage.setItem("st_groupDisplayName", newName);
           const nameEl = document.getElementById("groupNameDisplay");
           if (nameEl) nameEl.textContent = newName;
           document.getElementById("renameGroupSection").style.display = "none";
           playSaveSound();
-          showToast("Group name updated!");
+          showToast(
+            "Naya naam, wahi purane kaand! 🏷️🎭",
+            "",
+            "Group update ho gaya.",
+          );
         } catch (e) {
-          showToast("Failed to rename. Try again.", "error");
+          showToast(
+            "Naam badalna itna mushkil kyun hai? 😤",
+            "error",
+            "Rename fail hua. Dobara try karo.",
+          );
         }
       }
 
@@ -1554,7 +1669,14 @@ document.getElementById("profileOverlay").style.display = "block";
 
       function saveProfile() {
         const name = document.getElementById("prof-name").value.trim();
-        if (!name) { showToast("Name cannot be empty!", "error"); return; }
+      if (!name) {
+        showToast(
+          "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+          "error",
+          "Pehle naam toh likho.",
+        );
+        return;
+      }
         profile.name = name;
         profile.cls = document.getElementById("prof-class").value;
         profile.examDate = document.getElementById("prof-exam").value;
@@ -1565,7 +1687,11 @@ document.getElementById("profileOverlay").style.display = "block";
           pushGroupUpdate(false);
         }
         playSaveSound();
-        showToast("Profile saved!");
+      showToast(
+        "Pehchaan surakshit! 🏆👤",
+        "",
+        "Ab isi naam se top karna hai.",
+      );
         closeProfile();
         renderAll();
       }
@@ -1603,7 +1729,11 @@ function cancelProfileEdit() {
   document.getElementById("prof-exam").value = profile.examDate || "";
 
   setProfileEditMode(false);
-  showToast("Changes discarded.", "info");
+ showToast(
+   "Purani yaadein hi achhi thin... 🔙🚫",
+   "info",
+   "Badlav cancel kar diya.",
+ );
 }
 
 // Unified swipe handler — open from left edge, close by swiping left
