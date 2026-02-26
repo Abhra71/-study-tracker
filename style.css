@@ -1048,7 +1048,77 @@
         .toast { left: auto; width: auto; min-width: 300px; max-width: 380px; }
       }
 
-      /* ── EMPTY ── */
+     /* ── MISSED GRACE SECTION ── */
+.card-red {
+  border-color: rgba(248, 113, 113, 0.2) !important;
+}
+.section-title.red {
+  color: #f87171;
+}
+.grace-timer-block {
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.grace-timer-label {
+  font-size: 0.78rem;
+  color: #f87171;
+  font-weight: 600;
+}
+.grace-timer-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #f87171;
+  font-variant-numeric: tabular-nums;
+}
+.grace-card {
+  background: var(--bg3);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.grace-card h3 {
+  color: #f87171;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.missed-perm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(127, 29, 29, 0.12);
+  border: 1px solid rgba(127, 29, 29, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 0.82rem;
+  color: #f87171;
+  margin-bottom: 5px;
+  gap: 8px;
+}
+.missed-perm-item .info {
+  flex: 1;
+  min-width: 0;
+}
+.missed-perm-item .name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.missed-perm-item .meta {
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-top: 1px;
+}
+
+/* ── EMPTY ── */
       .empty {
         text-align: center;
         padding: 28px 16px;
