@@ -746,7 +746,11 @@ function switchTab(e, name) {
     .forEach((b) => b.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
   e.target.classList.add("active");
-  if (name === "group") renderGroup();
+  if (name === "group") {
+    const nameEl = document.getElementById("grp-name");
+    if (nameEl && profile) nameEl.value = profile.name || "";
+    renderGroup();
+  }
   if (name === "weak") renderWeak();
   if (name === "chapters") renderSubjectGrid();
 }
@@ -1366,17 +1370,17 @@ async function createGroup() {
     );
     return;
   }
-  const name = document.getElementById("grp-name").value.trim();
-  if (!name) {
-    showToast(
-      "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
-      "error",
-      "Group mein dikhne ke liye naam chahiye.",
-    );
-    return;
-  }
-  const grpNameVal =
-    document.getElementById("grp-groupname").value.trim() || name + "'s Group";
+ const name = profile && profile.name ? profile.name.trim() : "";
+ if (!name) {
+   showToast(
+     "Pehle profile mein naam set karo! 👤",
+     "error",
+     "Profile drawer kholo aur naam likho.",
+   );
+   return;
+ }
+ const grpNameVal =
+   document.getElementById("grp-groupname").value.trim() || name + "'s Group";
   const code = generateGroupCode();
   groupCode = code;
   groupName = name;
@@ -1424,11 +1428,11 @@ async function joinGroup() {
     );
     return;
   }
-  const name = document.getElementById("grp-name").value.trim();
-  const code = document
-    .getElementById("grp-code-input")
-    .value.trim()
-    .toUpperCase();
+ const name = profile && profile.name ? profile.name.trim() : "";
+ const code = document
+   .getElementById("grp-code-input")
+   .value.trim()
+   .toUpperCase();
   if (!name) {
     showToast(
       "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
@@ -1699,9 +1703,11 @@ function renderGroup() {
     if (savedName) document.getElementById("grp-name").value = savedName;
     return;
   }
-  document.getElementById("groupSetup").style.display = "none";
-  document.getElementById("groupMain").style.display = "block";
-  document.getElementById("groupCodeDisplay").textContent = groupCode;
+ document.getElementById("groupSetup").style.display = "none";
+ document.getElementById("groupMain").style.display = "block";
+ document.getElementById("groupCodeDisplay").textContent = groupCode;
+ const grpNameInput = document.getElementById("grp-name");
+ if (grpNameInput && profile) grpNameInput.value = profile.name || "";
   const nameEl = document.getElementById("groupNameDisplay");
   if (nameEl) nameEl.textContent = groupDisplayName || "";
   const renameBtn = document.getElementById("renameGroupBtn");
@@ -1818,11 +1824,10 @@ function renderAll() {
   renderDoneRevisions();
   renderCalendar();
   renderSubjectGrid();
-  renderWeekly();
-  updateGreeting();
-  updateStreak();
-  // exam countdown now lives in profile sidebar
-  logTodayActivity();
+logTodayActivity();
+renderWeekly();
+updateGreeting();
+updateStreak();
   updateCoinsUI();
 }
 
@@ -1848,6 +1853,14 @@ function initApp() {
   }
 }
 // ── PROFILE SIDEBAR FUNCTIONS ──
+function toggleGroupCode() {
+  const panel = document.getElementById("groupCodePanel");
+  const btn = document.getElementById("showCodeBtn");
+  const isOpen = panel.classList.contains("open");
+  panel.classList.toggle("open");
+  btn.textContent = isOpen ? "🔑 Show Group Code" : "🔒 Hide Code";
+}
+
 function openProfile() {
   if (!profile) return;
   document.getElementById("prof-name").value = profile.name || "";
