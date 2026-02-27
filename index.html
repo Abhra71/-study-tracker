@@ -85,14 +85,20 @@
     <!-- ── HEADER ── -->
     <header class="header">
       <div class="header-top">
-        <div class="header-left">
-          <h1>📚 Study Tracker</h1>
-          <p class="greeting" id="greeting">Track · Revise · Excel</p>
+       <div class="header-left">
+          <button class="hamburger-btn" onclick="openProfile()" aria-label="Open menu">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+          </button>
+          <div>
+            <h1>Study Tracker</h1>
+            <p class="greeting" id="greeting">Track · Revise · Excel</p>
+          </div>
         </div>
         <div class="header-right">
           <div class="streak-pill" id="streakPill">🔥 0</div>
           <div class="streak-pill coin-pill" id="coinPill">🪙 0</div>
-     <!-- exam pill moved to profile sidebar -->
         </div>
       </div>
  <div class="tabs">
@@ -196,16 +202,11 @@
       <!-- ── GROUP TAB ── -->
       <div id="tab-group" class="tab-content">
         <div id="groupSetup" class="card">
-          <h2 class="section-title indigo">👥 Study Group</h2>
-          <p
-            style="color: var(--text2); font-size: 0.83rem; margin-bottom: 14px"
-          >
+         <h2 class="section-title indigo">👥 Study Group</h2>
+          <p style="color: var(--text2); font-size: 0.83rem; margin-bottom: 14px">
             Connect with friends and stay accountable together!
           </p>
- <div class="field">
-            <label>Your Display Name in Group</label
-            ><input type="text" id="grp-name" placeholder="e.g. George" />
-          </div>
+          <input type="hidden" id="grp-name" />
           <div class="field" id="grp-groupname-field">
             <label>Group Name (creator only)</label>
             <input type="text" id="grp-groupname" placeholder="e.g. Class 10 Batch A" maxlength="40" />
@@ -245,31 +246,33 @@
             </div>
           </div>
         </div>
-        <div id="groupMain" style="display: none">
+      <div id="groupMain" style="display: none">
           <div class="card card-purple">
-            <div class="group-info">
-              <p
-                style="
-                  color: var(--text2);
-                  font-size: 0.78rem;
-                  text-align: center;
-                "
-              >
-                Your Group Code
-              </p>
-              <div class="group-code" id="groupCodeDisplay">------</div>
-              <p
-                style="
-                  color: var(--text3);
-                  font-size: 0.72rem;
-                  text-align: center;
-                "
-              >
-                Share this code with friends!
-              </p>
+
+            <!-- group name — large and prominent -->
+            <div id="groupNameDisplay" class="grp-name-display"></div>
+
+            <!-- code — collapsed by default -->
+            <div class="grp-code-row">
+              <button class="grp-show-code-btn" onclick="toggleGroupCode()" id="showCodeBtn">
+                🔑 Show Group Code
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="leaveGroup()">Leave</button>
             </div>
-      <div id="groupNameDisplay" style="text-align:center;font-size:1rem;font-weight:700;color:#a5b4fc;margin:6px 0 2px;letter-spacing:0.5px"></div>
-            <div id="renameGroupSection" style="display:none;margin-top:8px">
+
+            <!-- expandable code panel -->
+            <div id="groupCodePanel" class="grp-code-panel">
+              <p class="grp-code-label">Your Group Code</p>
+              <div class="group-code" id="groupCodeDisplay">------</div>
+              <p class="grp-code-hint">Share this code with friends!</p>
+              <div style="display:flex; gap:8px; margin-top:10px">
+                <button class="btn btn-secondary btn-sm" style="flex:1" onclick="copyGroupCode()">📋 Copy</button>
+                <button id="renameGroupBtn" class="btn btn-secondary btn-sm" style="flex:1;display:none" onclick="toggleRenameGroup()">✏️ Rename</button>
+              </div>
+            </div>
+
+            <!-- rename section -->
+            <div id="renameGroupSection" style="display:none;margin-top:10px">
               <div class="inline-row" style="margin-bottom:0">
                 <div class="field" style="margin-bottom:0;flex:1">
                   <input type="text" id="rename-grp-input" placeholder="New group name" maxlength="40" style="font-size:0.82rem" />
@@ -277,30 +280,7 @@
                 <button class="btn btn-primary btn-sm" onclick="renameGroup()">Save</button>
               </div>
             </div>
-            <div style="display: flex; gap: 8px; margin-top: 8px">
-              <button
-                class="btn btn-secondary btn-sm"
-                style="flex: 1"
-                onclick="copyGroupCode()"
-              >
-                📋 Copy Code
-              </button>
-              <button
-                id="renameGroupBtn"
-                class="btn btn-secondary btn-sm"
-                style="flex:1;display:none"
-                onclick="toggleRenameGroup()"
-              >
-                ✏️ Rename
-              </button>
-              <button
-                class="btn btn-danger btn-sm"
-                style="flex: 1"
-                onclick="leaveGroup()"
-              >
-                Leave Group
-              </button>
-            </div>
+
           </div>
           <div class="card">
             <h2 class="section-title purple">🏆 Leaderboard</h2>
@@ -384,10 +364,7 @@
     </main>
 
  <!-- ── PROFILE SIDEBAR ── -->
-    <div id="profileTab" onclick="openProfile()" title="Profile">
-      <span class="tab-icon">👤</span>
-      <span class="tab-label">Me</span>
-    </div>
+   <div id="profileTab"></div>
     <div id="profileOverlay" onclick="closeProfile()"></div>
     <div id="profileDrawer">
       <div class="drawer-header">
