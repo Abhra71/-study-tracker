@@ -571,7 +571,7 @@ function updateStreak() {
 
   // Grace expiry check — only reset if grace has fully expired (not just missed yesterday)
   const graceExpired = isGraceExpired(yesterday);
-  const yesterdayDue = revisions.filter((r) => r.dueDate === yesterday && !r.missedPermanently).length;
+const yesterdayDue = revisions.filter((r) => r.dueDate === yesterday).length;
   const yesterdayDone = revisions.filter((r) => r.dueDate === yesterday && r.done).length;
   const yesterdayAllDone = yesterdayDue === 0 || yesterdayDone >= yesterdayDue;
 
@@ -650,21 +650,38 @@ function processMissedRevisions() {
   const penaltyFiredKey = "st_penalty_" + yesterday;
   const alreadyPenalized = localStorage.getItem(penaltyFiredKey);
 
-  // Find all undone revisions older than yesterday — permanently missed immediately
+  // Find all undone revisions older than yesterday — permanently missed, with penalty per missed day
   const veryOld = revisions.filter(
-    (r) => !r.done && !r.missedPermanently && r.dueDate < yesterday
+    (r) => !r.done && !r.missedPermanently && r.dueDate < yesterday,
   );
-  veryOld.forEach((r) => {
-    r.missedPermanently = true;
-    missedRevisions.push({
-      id: r.id,
-      chapterName: r.chapterName,
-      subject: r.subject,
-      dueDate: r.dueDate,
-      dayOffset: r.dayOffset,
-      missedAt: t,
+  if (veryOld.length > 0) {
+    const missedDays = [...new Set(veryOld.map((r) => r.dueDate))];
+    missedDays.forEach((day) => {
+      const penaltyKey = "st_penalty_" + day;
+      if (!localStorage.getItem(penaltyKey)) {
+        coins = Math.max(0, (coins || 0) - 3);
+        streak.count = 0;
+        localStorage.setItem(penaltyKey, "1");
+      }
     });
-  });
+    veryOld.forEach((r) => {
+      r.missedPermanently = true;
+      missedRevisions.push({
+        id: r.id,
+        chapterName: r.chapterName,
+        subject: r.subject,
+        dueDate: r.dueDate,
+        dayOffset: r.dayOffset,
+        missedAt: t,
+      });
+    });
+    save();
+    showToast(
+      "Kuch din ki chutti li? 😤📅",
+      "error",
+      `${missedDays.length} missed day(s) — streak reset, coins deducted.`,
+    );
+  }
 
   // Find yesterday's undone revisions where grace has expired
   const graceExpiredYesterday = revisions.filter(
@@ -672,7 +689,7 @@ function processMissedRevisions() {
       !r.done &&
       !r.missedPermanently &&
       r.dueDate === yesterday &&
-      isGraceExpired(yesterday)
+      isGraceExpired(yesterday),
   );
 
   if (graceExpiredYesterday.length > 0 && !alreadyPenalized) {
@@ -746,11 +763,9 @@ function switchTab(e, name) {
     .forEach((b) => b.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
   e.target.classList.add("active");
-  if (name === "group") {
-    const nameEl = document.getElementById("grp-name");
-    if (nameEl && profile) nameEl.value = profile.name || "";
-    renderGroup();
-  }
+if (name === "group") {
+  renderGroup();
+}
   if (name === "weak") renderWeak();
   if (name === "chapters") renderSubjectGrid();
 }
@@ -765,6 +780,20 @@ function populateSubjectDropdown() {
     opt.textContent = s;
     sel.appendChild(opt);
   });
+
+  // Also populate the subject filter in Chapters tab
+  const filter = document.getElementById("subjectFilter");
+  if (filter) {
+    const current = filter.value;
+    filter.innerHTML = '<option value="all">All Subjects</option>';
+    subjects.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      filter.appendChild(opt);
+    });
+    filter.value = current && subjects.includes(current) ? current : "all";
+  }
 }
 function addCustomSubject() {
   const input = document.getElementById("customSubject");
@@ -878,31 +907,33 @@ function markRevDone(id) {
       : document.querySelector(`button[onclick*="${id}"]`);
   const originRect = originEl ? originEl.getBoundingClientRect() : null;
 
-  rev.done = true;
+rev.done = true;
+rev.completedOn = todayStr();
 
-  const earned = coinForOffset(rev.dayOffset);
-  if (earned > 0) {
-    coins = (coins || 0) + earned;
+const earned = coinForOffset(rev.dayOffset);
+if (earned > 0) {
+  coins = (coins || 0) + earned;
+}
+rev.earnedCoins = earned;
+
+save();
+renderAll();
+
+playDoneSound();
+if (earned > 0) {
+  setTimeout(playCoinSound, 90);
+  if (originRect) {
+    setTimeout(() => flyCoinsFromRect(originRect, earned), 120);
   }
+}
 
-  save();
-  renderAll();
-
-  playDoneSound();
-  if (earned > 0) {
-    setTimeout(playCoinSound, 90);
-    if (originRect) {
-      setTimeout(() => flyCoinsFromRect(originRect, earned), 120);
-    }
-  }
-
-  showToast(
-    `Shabash sher! 🦁💰`,
-    "",
-    earned > 0
-      ? `Teri mehnat ke +${earned}🪙 mil gaye. Party kab hai?`
-      : "Revision done! Agli baar coins bhi milenge.",
-  );
+showToast(
+  `Shabash sher! 🦁💰`,
+  "",
+  earned > 0
+    ? `Teri mehnat ke +${earned}🪙 mil gaye. Party kab hai?`
+    : "Revision done! Agli baar coins bhi milenge.",
+);
   pushGroupUpdate();
   checkGroupMilestone();
 }
@@ -917,13 +948,14 @@ function markGraceDone(id) {
       : document.querySelector(`button[onclick*="${id}"]`);
   const originRect = originEl ? originEl.getBoundingClientRect() : null;
 
-  rev.done = true;
+rev.done = true;
+rev.completedOn = todayStr();
 rev.completedInGrace = true;
-rev.earnedCoins = Math.max(1, coinForOffset(rev.dayOffset) - 2);
 
 const base = coinForOffset(rev.dayOffset);
-  const earned = Math.max(1, base - 2);
-  coins = (coins || 0) + earned;
+const earned = Math.max(1, base - 2);
+rev.earnedCoins = earned;
+coins = (coins || 0) + earned;
 
   save();
   renderAll();
@@ -951,6 +983,14 @@ function deleteRevision(id) {
   renderAll();
   playDeleteSound();
   pushGroupUpdate();
+}
+
+function deleteRevisionFromDone(id) {
+  // Only removes from display — does not affect coins, streak, or group stats
+  revisions = revisions.filter((r) => r.id !== id);
+  save();
+  renderDoneRevisions();
+  playDeleteSound();
 }
 function deleteMissedPermanent(id) {
   missedRevisions = missedRevisions.filter((r) => r.id !== id);
@@ -1058,10 +1098,10 @@ function renderTodayRevisions() {
       const revs = graceGroups[subject];
       revs.forEach((r) => {
         const reduced = Math.max(1, coinForOffset(r.dayOffset) - 2);
-        graceRows += `<div class="rev-row" style="border-left:3px solid #f87171">
+      graceRows += `<div class="rev-row" style="border-left:3px solid #f87171">
           <div style="flex:1;min-width:0">
             <p>${sanitize(r.chapterName)}</p>
-            <span style="color:#f87171">⚠ Missed · ${sanitize(r.subject)} · +${r.dayOffset}d · ${reduced}🪙 (reduced)</span>
+            <span style="color:#f87171">⚠ Grace · ${sanitize(r.subject)} · +${r.dayOffset}d · Will earn: ${reduced}🪙 (reduced)</span>
           </div>
           <div class="rev-actions">
             <button class="btn btn-success btn-sm" onclick="markGraceDone('${r.id}')">✓ Done</button>
@@ -1092,17 +1132,15 @@ function renderTodayRevisions() {
       el.textContent = `${h}h ${String(m).padStart(2, "0")}m`;
     }, 10000);
 
-    setTimeout(() => {
-      const el2 = document.getElementById("graceCountdown");
-      if (el2) {
-        const diff = graceExpiry.getTime() - Date.now();
-        if (diff > 0) {
-          const h = Math.floor(diff / 3600000);
-          const m = Math.floor((diff % 3600000) / 60000);
-          el2.textContent = `${h}h ${String(m).padStart(2, "0")}m`;
-        }
-      }
-    }, 0);
+const el2 = document.getElementById("graceCountdown");
+if (el2) {
+  const diff = graceExpiry.getTime() - Date.now();
+  if (diff > 0) {
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    el2.textContent = `${h}h ${String(m).padStart(2, "0")}m`;
+  }
+}
   } else {
     if (graceTimerInterval) { clearInterval(graceTimerInterval); graceTimerInterval = null; }
   }
@@ -1116,8 +1154,8 @@ function renderTodayRevisions() {
     const revs = groups[subject];
     let rows = "";
     revs.forEach((r) => {
-      rows += `<div class="rev-row">
-        <div style="flex:1;min-width:0"><p>${sanitize(r.chapterName)}</p><span>+${r.dayOffset} day revision · Reward ${coinForOffset(r.dayOffset)}🪙</span></div>
+     rows += `<div class="rev-row">
+        <div style="flex:1;min-width:0"><p>${sanitize(r.chapterName)}</p><span>+${r.dayOffset}d · Will earn: ${coinForOffset(r.dayOffset)}🪙</span></div>
         <div class="rev-actions">
           <button class="btn btn-success btn-sm" onclick="markRevDone('${r.id}')">✓ Done</button>
         </div></div>`;
@@ -1145,9 +1183,18 @@ function renderDoneRevisions() {
       const revs = groups[subject];
       let items = "";
       revs.forEach((r) => {
-       items += `<div class="done-item">
-  <div class="info"><div class="name">${sanitize(r.chapterName)}</div><div class="meta">+${r.dayOffset} day · ${fmtDate(r.dueDate)} · +${r.earnedCoins !== undefined ? r.earnedCoins : coinForOffset(r.dayOffset)}🪙</div></div>
-  <button class="btn btn-danger btn-xs" onclick="deleteRevision('${r.id}')">🗑</button>
+      const doneLabel = r.completedOn
+        ? r.completedInGrace
+          ? `Completed on grace: ${fmtDate(r.completedOn)}`
+          : `Completed on: ${fmtDate(r.completedOn)}`
+        : fmtDate(r.dueDate);
+      const doneCoins =
+        r.earnedCoins !== undefined
+          ? r.earnedCoins
+          : coinForOffset(r.dayOffset);
+      items += `<div class="done-item">
+  <div class="info"><div class="name">${sanitize(r.chapterName)}</div><div class="meta">+${r.dayOffset}d · ${doneLabel} · +${doneCoins}🪙</div></div>
+  <button class="btn btn-danger btn-xs" onclick="deleteRevisionFromDone('${r.id}')">🗑</button>
 </div>`;
       });
       html += `<div style="margin-bottom:12px"><p style="color:var(--green);font-size:0.72rem;font-weight:600;text-transform:uppercase;margin-bottom:5px">${sanitize(subject)}</p>${items}</div>`;
@@ -1210,7 +1257,7 @@ function renderCalendar() {
     const revs = byDate[date];
     let chips = "";
     revs.forEach((r) => {
-      chips += `<div class="cal-chip"><p class="chip-name">${sanitize(r.chapterName)}</p><p class="chip-meta">${sanitize(r.subject)} +${r.dayOffset}d · ${coinForOffset(r.dayOffset)}🪙</p></div>`;
+    chips += `<div class="cal-chip"><p class="chip-name">${sanitize(r.chapterName)}</p><p class="chip-meta">${sanitize(r.subject)} · +${r.dayOffset}d · Will earn: ${coinForOffset(r.dayOffset)}🪙</p></div>`;
     });
     html += `<div class="cal-day">
       <div class="cal-day-header">
@@ -1226,11 +1273,15 @@ function renderCalendar() {
 // ── RENDER SUBJECT GRID ──
 function renderSubjectGrid() {
   const grid = document.getElementById("subjectGrid");
+  const subjectFilterEl = document.getElementById("subjectFilter");
+  const selectedSubject = subjectFilterEl ? subjectFilterEl.value : "all";
   let filtered = chapters.slice();
   if (currentFilter === "completed")
     filtered = filtered.filter((c) => c.status === "Completed");
   if (currentFilter === "pending")
     filtered = filtered.filter((c) => c.status !== "Completed");
+  if (selectedSubject !== "all")
+    filtered = filtered.filter((c) => c.subject === selectedSubject);
   const groups = {};
   filtered.forEach((c) => {
     if (!groups[c.subject]) groups[c.subject] = [];
@@ -1285,6 +1336,16 @@ function renderWeak() {
   grid.innerHTML = html;
 }
 
+// ── TOGGLE REVISIONS INSIDE CHAPTER CARD ──
+function toggleRevisions(chId) {
+  const el = document.getElementById("rev-expand-" + chId);
+  const btn = document.getElementById("rev-btn-" + chId);
+  if (!el || !btn) return;
+  const isOpen = el.style.display !== "none";
+  el.style.display = isOpen ? "none" : "block";
+  btn.textContent = isOpen ? "📋 See Revisions" : "🔼 Hide Revisions";
+}
+
 // ── CHAPTER CARD ──
 function chapterCard(ch) {
   const badgeClass =
@@ -1316,10 +1377,65 @@ function chapterCard(ch) {
   });
   const dotsHtml = dots ? `<div class="rev-dots">${dots}</div>` : "";
 
+  // Build See Revisions sections
+  const chRevs = revisions.filter((r) => r.chapterId === ch.id);
+  const missedChRevs = missedRevisions.filter((r) => {
+    // match by chapterId if stored, else by chapterName+subject
+    return (
+      r.chapterId === ch.id ||
+      (r.chapterName === ch.name && r.subject === ch.subject)
+    );
+  });
+
+  const completedRevs = chRevs.filter((r) => r.done);
+  const upcomingRevs = chRevs.filter((r) => !r.done && !r.missedPermanently);
+  const missedRevs = chRevs.filter((r) => r.missedPermanently);
+
+  let completedHtml = "";
+  completedRevs.forEach((r) => {
+    if (!r.completedOn) return; // skip old revisions with no date
+    const graceLabel = r.completedInGrace ? " (grace)" : "";
+    const dateLabel = r.completedInGrace
+      ? `Completed on grace: ${fmtDate(r.completedOn)}`
+      : `Completed on: ${fmtDate(r.completedOn)}`;
+    const earned =
+      r.earnedCoins !== undefined ? r.earnedCoins : coinForOffset(r.dayOffset);
+    completedHtml += `<div class="see-rev-item see-rev-done">
+      <span class="see-rev-interval">+${r.dayOffset}d${graceLabel}</span>
+      <span class="see-rev-date">${dateLabel}</span>
+      <span class="see-rev-coins">+${earned}🪙</span>
+    </div>`;
+  });
+  if (!completedHtml)
+    completedHtml = `<div class="see-rev-empty">No completed revisions yet.</div>`;
+
+  let upcomingHtml = "";
+  upcomingRevs.forEach((r) => {
+    upcomingHtml += `<div class="see-rev-item see-rev-upcoming">
+      <span class="see-rev-interval">+${r.dayOffset}d</span>
+      <span class="see-rev-date">Upcoming on: ${fmtDate(r.dueDate)}</span>
+      <span class="see-rev-coins">Will earn: ${coinForOffset(r.dayOffset)}🪙</span>
+    </div>`;
+  });
+  if (!upcomingHtml)
+    upcomingHtml = `<div class="see-rev-empty">No upcoming revisions.</div>`;
+
+  let missedHtml = "";
+  missedRevs.forEach((r) => {
+    const missedDate = r.missedAt ? fmtDate(r.missedAt) : fmtDate(r.dueDate);
+    missedHtml += `<div class="see-rev-item see-rev-missed">
+      <span class="see-rev-interval">+${r.dayOffset}d</span>
+      <span class="see-rev-date">Missed on: ${missedDate}</span>
+      <span class="see-rev-coins">0🪙 earned</span>
+    </div>`;
+  });
+  if (!missedHtml)
+    missedHtml = `<div class="see-rev-empty">No missed revisions.</div>`;
+
   return `<div class="chapter-card">
     <div class="chapter-card-top">
       <div style="flex:1;min-width:0">
-     <span class="chapter-name">${sanitize(ch.name)}</span>${weakBadge}
+        <span class="chapter-name">${sanitize(ch.name)}</span>${weakBadge}
         <div><span class="badge ${badgeClass}">${ch.status}</span></div>
         ${nextRev}${dotsHtml}
         <p class="added-date">Added: ${fmtDate(ch.dateAdded)}</p>
@@ -1330,7 +1446,24 @@ function chapterCard(ch) {
         <option value="Completed"${ch.status === "Completed" ? " selected" : ""}>Completed</option>
       </select>
     </div>
-    <button class="btn btn-danger btn-xs full" style="margin-top:8px" onclick="deleteChapter('${ch.id}')">🗑 Delete Chapter</button>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="btn btn-secondary btn-xs" style="flex:1" id="rev-btn-${ch.id}" onclick="toggleRevisions('${ch.id}')">📋 See Revisions</button>
+      <button class="btn btn-danger btn-xs" style="flex:1" onclick="deleteChapter('${ch.id}')">🗑 Delete Chapter</button>
+    </div>
+    <div id="rev-expand-${ch.id}" style="display:none;margin-top:10px">
+      <div class="see-rev-section">
+        <div class="see-rev-label see-rev-label-done">✅ Completed</div>
+        ${completedHtml}
+      </div>
+      <div class="see-rev-section">
+        <div class="see-rev-label see-rev-label-upcoming">⏰ Upcoming</div>
+        ${upcomingHtml}
+      </div>
+      <div class="see-rev-section">
+        <div class="see-rev-label see-rev-label-missed">❌ Missed</div>
+        ${missedHtml}
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1379,8 +1512,8 @@ async function createGroup() {
    );
    return;
  }
- const grpNameVal =
-   document.getElementById("grp-groupname").value.trim() || name + "'s Group";
+const grpNameVal =
+  document.getElementById("grp-groupname").value.trim() || name + "'s Group";
   const code = generateGroupCode();
   groupCode = code;
   groupName = name;
@@ -1412,11 +1545,6 @@ async function createGroup() {
 }
 function showJoinGroup() {
   document.getElementById("joinGroupPanel").style.display = "block";
-  document.getElementById("grp-groupname-field").style.display = "none";
-}
-function showCreateGroup() {
-  document.getElementById("joinGroupPanel").style.display = "none";
-  document.getElementById("grp-groupname-field").style.display = "flex";
 }
 
 async function joinGroup() {
@@ -1546,8 +1674,7 @@ async function leaveGroup() {
   localStorage.removeItem("st_groupDisplayName");
   document.getElementById("groupMain").style.display = "none";
   document.getElementById("groupSetup").style.display = "block";
-  document.getElementById("joinGroupPanel").style.display = "none";
-  document.getElementById("grp-groupname-field").style.display = "flex";
+ document.getElementById("joinGroupPanel").style.display = "none";
   playLeaveGroupSound();
   showToast(
     "Akela rahi... 🚶‍♂️💔",
@@ -1699,15 +1826,11 @@ function renderGroup() {
   if (!groupCode) {
     document.getElementById("groupSetup").style.display = "block";
     document.getElementById("groupMain").style.display = "none";
-    const savedName = profile ? profile.name : "";
-    if (savedName) document.getElementById("grp-name").value = savedName;
-    return;
+       return;
   }
  document.getElementById("groupSetup").style.display = "none";
  document.getElementById("groupMain").style.display = "block";
  document.getElementById("groupCodeDisplay").textContent = groupCode;
- const grpNameInput = document.getElementById("grp-name");
- if (grpNameInput && profile) grpNameInput.value = profile.name || "";
   const nameEl = document.getElementById("groupNameDisplay");
   if (nameEl) nameEl.textContent = groupDisplayName || "";
   const renameBtn = document.getElementById("renameGroupBtn");
