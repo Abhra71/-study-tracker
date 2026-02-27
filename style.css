@@ -1224,6 +1224,64 @@ main {
 /* ── CARD-RED explicit ── */
 .card-red { border-color: rgba(224,92,92,0.2) !important; }
 
+/* ── SEE REVISIONS EXPAND ── */
+.see-rev-section {
+  margin-bottom: 10px;
+}
+.see-rev-section:last-child { margin-bottom: 0; }
+.see-rev-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 5px;
+  font-family: 'Baloo 2', sans-serif;
+}
+.see-rev-label-done    { color: var(--green); }
+.see-rev-label-upcoming { color: var(--yellow); }
+.see-rev-label-missed  { color: var(--red); }
+.see-rev-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  border-radius: var(--radius-xs);
+  padding: 7px 10px;
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+  flex-wrap: wrap;
+}
+.see-rev-item:last-child { margin-bottom: 0; }
+.see-rev-done    { background: rgba(5,61,45,0.15); border: 1px solid rgba(45,158,107,0.2); }
+.see-rev-upcoming { background: rgba(232,160,32,0.06); border: 1px solid rgba(232,160,32,0.15); }
+.see-rev-missed  { background: rgba(100,10,30,0.12); border: 1px solid rgba(224,92,92,0.18); }
+.see-rev-interval {
+  font-weight: 700;
+  color: var(--text2);
+  flex-shrink: 0;
+  min-width: 36px;
+}
+.see-rev-date {
+  flex: 1;
+  color: var(--text2);
+  font-size: 0.72rem;
+}
+.see-rev-done .see-rev-date    { color: var(--green); }
+.see-rev-upcoming .see-rev-date { color: var(--yellow); }
+.see-rev-missed .see-rev-date  { color: var(--red); }
+.see-rev-coins {
+  font-weight: 700;
+  color: var(--text);
+  flex-shrink: 0;
+  font-size: 0.72rem;
+}
+.see-rev-empty {
+  font-size: 0.72rem;
+  color: var(--text3);
+  padding: 5px 10px;
+  font-style: italic;
+}
+
 /* ── GROUP SECTION ── */
 .grp-name-display {
   font-family: 'Tiro Devanagari Sanskrit', serif;
