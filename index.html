@@ -145,41 +145,18 @@
 
       <!-- ── CHAPTERS TAB ── -->
       <div id="tab-chapters" class="tab-content">
-        <div class="card">
-          <div
-            style="
-              display: flex;
-              gap: 8px;
-              margin-bottom: 10px;
-              flex-wrap: wrap;
-            "
-          >
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick="setFilter('all')"
-              id="f-all"
-            >
-              All
-            </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick="setFilter('completed')"
-              id="f-completed"
-            >
-              Completed
-            </button>
-            <button
-              class="btn btn-secondary btn-sm"
-              onclick="setFilter('pending')"
-              id="f-pending"
-            >
-              Pending
-            </button>
+       <div class="card">
+          <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="setFilter('all')" id="f-all">All</button>
+            <button class="btn btn-secondary btn-sm" onclick="setFilter('completed')" id="f-completed">Completed</button>
+            <button class="btn btn-secondary btn-sm" onclick="setFilter('pending')" id="f-pending">Pending</button>
+            <select id="subjectFilter" class="status-select" style="min-height:34px;font-size:0.78rem;" onchange="renderSubjectGrid()">
+              <option value="all">All Subjects</option>
+            </select>
           </div>
           <div id="subjectGrid" class="subject-grid"></div>
         </div>
       </div>
-
       <!-- ── CALENDAR TAB ── -->
       <div id="tab-calendar" class="tab-content">
         <div class="card card-indigo">
@@ -203,19 +180,18 @@
       <div id="tab-group" class="tab-content">
         <div id="groupSetup" class="card">
          <h2 class="section-title indigo">👥 Study Group</h2>
-          <p style="color: var(--text2); font-size: 0.83rem; margin-bottom: 14px">
+         <p style="color: var(--text2); font-size: 0.83rem; margin-bottom: 14px">
             Connect with friends and stay accountable together!
           </p>
-          <input type="hidden" id="grp-name" />
-          <div class="field" id="grp-groupname-field">
-            <label>Group Name (creator only)</label>
+        <div class="field" id="grp-groupname-field">
+            <label>Group Name</label>
             <input type="text" id="grp-groupname" placeholder="e.g. Class 10 Batch A" maxlength="40" />
           </div>
           <div style="display: flex; gap: 8px; margin-bottom: 10px">
             <button
               class="btn btn-primary"
               style="flex: 1"
-              onclick="showCreateGroup(); createGroup()"
+              onclick="createGroup()"
             >
               Create Group
             </button>
