@@ -600,10 +600,10 @@ const yesterdayDue = revisions.filter((r) => r.dueDate === yesterday).length;
 
 // Grace period helpers
 function graceExpireTime(dueDateStr) {
-  // Grace expires at midnight IST of the day after dueDate
-  // midnight IST = 18:30 UTC of the previous calendar day
-  const nextDay = addDays(dueDateStr, 1);
-  const [y, m, d] = nextDay.split("-").map(Number);
+  // Grace expires at midnight IST of TWO days after dueDate
+  // i.e. user has the full next calendar day (IST) to complete in grace
+  const twoDaysLater = addDays(dueDateStr, 2);
+  const [y, m, d] = twoDaysLater.split("-").map(Number);
   const midnightUTC = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
   return new Date(midnightUTC.getTime() - 5.5 * 60 * 60 * 1000);
 }
@@ -652,7 +652,11 @@ function processMissedRevisions() {
 
   // Find all undone revisions older than yesterday — permanently missed, with penalty per missed day
   const veryOld = revisions.filter(
-    (r) => !r.done && !r.missedPermanently && r.dueDate < yesterday,
+    (r) =>
+      !r.done &&
+      !r.missedPermanently &&
+      r.dueDate < yesterday &&
+      isGraceExpired(r.dueDate),
   );
   if (veryOld.length > 0) {
     const missedDays = [...new Set(veryOld.map((r) => r.dueDate))];
@@ -1354,9 +1358,9 @@ function chapterCard(ch) {
       : ch.status === "In Progress"
         ? "badge-ip"
         : "badge-ns";
-  const upcoming = revisions
-    .filter((r) => r.chapterId === ch.id && !r.done)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+ const upcoming = revisions
+   .filter((r) => r.chapterId === ch.id && !r.done && !r.missedPermanently)
+   .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const t = todayStr();
   let nextRev = "";
   if (upcoming[0]) {
@@ -1372,7 +1376,13 @@ function chapterCard(ch) {
       (r) => r.chapterId === ch.id && r.dayOffset === n,
     );
     if (!rev) return;
-    const cls = rev.done ? "done" : rev.dueDate === t ? "today" : "pending";
+   const cls = rev.done
+     ? "done"
+     : rev.missedPermanently
+       ? "missed"
+       : rev.dueDate === t
+         ? "today"
+         : "pending";
     dots += `<div class="rev-dot ${cls}" title="+${n}d">${n}</div>`;
   });
   const dotsHtml = dots ? `<div class="rev-dots">${dots}</div>` : "";
@@ -1545,6 +1555,7 @@ const grpNameVal =
 }
 function showJoinGroup() {
   document.getElementById("joinGroupPanel").style.display = "block";
+  document.getElementById("grp-groupname-field").style.display = "none";
 }
 
 async function joinGroup() {
@@ -1674,7 +1685,8 @@ async function leaveGroup() {
   localStorage.removeItem("st_groupDisplayName");
   document.getElementById("groupMain").style.display = "none";
   document.getElementById("groupSetup").style.display = "block";
- document.getElementById("joinGroupPanel").style.display = "none";
+  document.getElementById("joinGroupPanel").style.display = "none";
+  document.getElementById("grp-groupname-field").style.display = "";
   playLeaveGroupSound();
   showToast(
     "Akela rahi... 🚶‍♂️💔",
@@ -2019,7 +2031,7 @@ function openProfile() {
   // group info
   const gi = document.getElementById("prof-group-info");
   gi.innerHTML = groupCode
-    ? `<strong>Status</strong>In group <span style="color:#6366f1;font-weight:700">${groupCode}</span> as "${sanitize(groupName)}"`
+    ? `<strong>Status</strong>In group <span style="color:var(--indigo);font-weight:700">${groupCode}</span> as "${sanitize(groupName)}"`
     : `<strong>Status</strong>Not in any group.`;
   // open
   setProfileEditMode(false);
