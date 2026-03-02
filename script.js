@@ -477,9 +477,11 @@ function fireNotification() {
   if (!("Notification" in window) || Notification.permission !== "granted")
     return;
   const t = todayStr();
-  const due = revisions.filter((r) => r.dueDate === t && !r.done);
-  if (due.length === 0) return;
-  const name = profile ? profile.name : "";
+const due = revisions.filter(
+  (r) => r.dueDate === t && !r.done && !r.missedPermanently,
+);
+if (due.length === 0) return;
+const name = profile ? profile.name : "";
   const names =
     due
       .slice(0, 3)
@@ -545,8 +547,12 @@ function updateGreeting() {
   const greet =
     h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const t = todayStr();
-  const due = revisions.filter((r) => r.dueDate === t && !r.done);
-  const overdue = revisions.filter((r) => r.dueDate < t && !r.done);
+ const due = revisions.filter(
+   (r) => r.dueDate === t && !r.done && !r.missedPermanently,
+ );
+ const overdue = revisions.filter(
+   (r) => r.dueDate < t && !r.done && !r.missedPermanently,
+ );
   const totalPending = due.length + overdue.length;
   let msg = `${greet}, ${profile.name}!`;
 const yesterday = addDays(t, -1);
@@ -989,28 +995,39 @@ function deleteRevision(id) {
   pushGroupUpdate();
 }
 
-function deleteRevisionFromDone(id) {
-  // Only removes from display — does not affect coins, streak, or group stats
-  revisions = revisions.filter((r) => r.id !== id);
-  save();
-  renderDoneRevisions();
-  playDeleteSound();
+
+
+let _confirmCallback = null;
+
+function showConfirmModal(question, onYes) {
+  _confirmCallback = onYes;
+  document.getElementById("confirmQuestion").textContent = question;
+  document.getElementById("confirmModal").classList.remove("hidden");
 }
-function deleteMissedPermanent(id) {
-  missedRevisions = missedRevisions.filter((r) => r.id !== id);
-  save();
-  renderDoneRevisions();
-  playDeleteSound();
+
+function closeConfirmModal() {
+  _confirmCallback = null;
+  document.getElementById("confirmModal").classList.add("hidden");
+}
+
+function confirmYes() {
+  if (_confirmCallback) _confirmCallback();
+  closeConfirmModal();
 }
 
 function deleteChapter(id) {
-  if (!confirm("Delete this chapter and all its revisions?")) return;
-  chapters = chapters.filter((c) => c.id !== id);
-  revisions = revisions.filter((r) => r.chapterId !== id);
-  save();
-  renderAll();
-  playDeleteSound();
-  showToast("Gaya kaam se! 🚮💨", "", "Jaise exam ke baad sab bhool jate ho.");
+  showConfirmModal("Do you really want to delete this chapter?", () => {
+    chapters = chapters.filter((c) => c.id !== id);
+    revisions = revisions.filter((r) => r.chapterId !== id);
+    save();
+    renderAll();
+    playDeleteSound();
+    showToast(
+      "Gaya kaam se! 🚮💨",
+      "",
+      "Jaise exam ke baad sab bhool jate ho.",
+    );
+  });
 }
 function updateStatus(id, newStatus) {
   const ch = chapters.find((c) => c.id === id);
@@ -1102,7 +1119,7 @@ function renderTodayRevisions() {
       const revs = graceGroups[subject];
       revs.forEach((r) => {
         const reduced = Math.max(1, coinForOffset(r.dayOffset) - 2);
-      graceRows += `<div class="rev-row" style="border-left:3px solid #f87171">
+        graceRows += `<div class="rev-row" style="border-left:3px solid #f87171">
           <div style="flex:1;min-width:0">
             <p>${sanitize(r.chapterName)}</p>
             <span style="color:#f87171">⚠ Grace · ${sanitize(r.subject)} · +${r.dayOffset}d · Will earn: ${reduced}🪙 (reduced)</span>
@@ -1123,7 +1140,10 @@ function renderTodayRevisions() {
     if (graceTimerInterval) clearInterval(graceTimerInterval);
     graceTimerInterval = setInterval(() => {
       const el = document.getElementById("graceCountdown");
-      if (!el) { clearInterval(graceTimerInterval); return; }
+      if (!el) {
+        clearInterval(graceTimerInterval);
+        return;
+      }
       const diff = graceExpiry.getTime() - Date.now();
       if (diff <= 0) {
         el.textContent = "Expired!";
@@ -1135,18 +1155,11 @@ function renderTodayRevisions() {
       const m = Math.floor((diff % 3600000) / 60000);
       el.textContent = `${h}h ${String(m).padStart(2, "0")}m`;
     }, 10000);
-
-const el2 = document.getElementById("graceCountdown");
-if (el2) {
-  const diff = graceExpiry.getTime() - Date.now();
-  if (diff > 0) {
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    el2.textContent = `${h}h ${String(m).padStart(2, "0")}m`;
-  }
-}
   } else {
-    if (graceTimerInterval) { clearInterval(graceTimerInterval); graceTimerInterval = null; }
+    if (graceTimerInterval) {
+      clearInterval(graceTimerInterval);
+      graceTimerInterval = null;
+    }
   }
 
   const groups = {};
@@ -1167,7 +1180,20 @@ if (el2) {
     html += `<div class="today-card"><h3>📖 ${sanitize(subject)}</h3>${rows}</div>`;
   });
 
-  grid.innerHTML = html;
+ grid.innerHTML = html;
+
+  if (grace.length > 0) {
+    const el2 = document.getElementById("graceCountdown");
+    if (el2) {
+      const graceExpiry = graceExpireTime(yesterday);
+      const diff = graceExpiry.getTime() - Date.now();
+      if (diff > 0) {
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        el2.textContent = `${h}h ${String(m).padStart(2, "0")}m`;
+      }
+    }
+  }
 }
 // ── RENDER DONE ──
 function renderDoneRevisions() {
@@ -1196,9 +1222,8 @@ function renderDoneRevisions() {
         r.earnedCoins !== undefined
           ? r.earnedCoins
           : coinForOffset(r.dayOffset);
-      items += `<div class="done-item">
+    items += `<div class="done-item">
   <div class="info"><div class="name">${sanitize(r.chapterName)}</div><div class="meta">+${r.dayOffset}d · ${doneLabel} · +${doneCoins}🪙</div></div>
-  <button class="btn btn-danger btn-xs" onclick="deleteRevisionFromDone('${r.id}')">🗑</button>
 </div>`;
       });
       html += `<div style="margin-bottom:12px"><p style="color:var(--green);font-size:0.72rem;font-weight:600;text-transform:uppercase;margin-bottom:5px">${sanitize(subject)}</p>${items}</div>`;
@@ -1226,12 +1251,11 @@ function renderDoneRevisions() {
     const revs = mGroups[subject];
     let items = "";
     revs.forEach((r) => {
-      items += `<div class="missed-perm-item">
+     items += `<div class="missed-perm-item">
         <div class="info">
           <div class="name">${sanitize(r.chapterName)}</div>
           <div class="meta">+${r.dayOffset}d · Due ${fmtDate(r.dueDate)} · Missed ${fmtDate(r.missedAt)}</div>
         </div>
-        <button class="btn btn-danger btn-xs" onclick="deleteMissedPermanent('${r.id}')">🗑</button>
       </div>`;
     });
     mHtml += `<div style="margin-bottom:12px"><p style="color:#f87171;font-size:0.72rem;font-weight:600;text-transform:uppercase;margin-bottom:5px">${sanitize(subject)}</p>${items}</div>`;
@@ -1243,9 +1267,9 @@ function renderDoneRevisions() {
 function renderCalendar() {
   const container = document.getElementById("calendarList");
   const t = todayStr();
-  const upcoming = revisions
-    .filter((r) => !r.done && r.dueDate >= t)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+const upcoming = revisions
+  .filter((r) => !r.done && !r.missedPermanently && r.dueDate >= t)
+  .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   if (upcoming.length === 0) {
     container.innerHTML =
       '<div class="empty"><div class="emoji">📭</div><p>No upcoming revisions.</p></div>';
@@ -1442,7 +1466,10 @@ function chapterCard(ch) {
   if (!missedHtml)
     missedHtml = `<div class="see-rev-empty">No missed revisions.</div>`;
 
-  return `<div class="chapter-card">
+const chRevs_lock = revisions.filter((r) => r.chapterId === ch.id);
+const isLocked = chRevs_lock.some((r) => r.done || r.missedPermanently);
+
+return `<div class="chapter-card">
     <div class="chapter-card-top">
       <div style="flex:1;min-width:0">
         <span class="chapter-name">${sanitize(ch.name)}</span>${weakBadge}
@@ -1450,15 +1477,29 @@ function chapterCard(ch) {
         ${nextRev}${dotsHtml}
         <p class="added-date">Added: ${fmtDate(ch.dateAdded)}</p>
       </div>
-      <select class="status-select" onchange="updateStatus('${ch.id}',this.value)">
-        <option value="Not Started"${ch.status === "Not Started" ? " selected" : ""}>Not Started</option>
-        <option value="In Progress"${ch.status === "In Progress" ? " selected" : ""}>In Progress</option>
-        <option value="Completed"${ch.status === "Completed" ? " selected" : ""}>Completed</option>
-      </select>
+${
+  isLocked
+    ? `<div onclick="showToast('Revision attempted! 🔒', 'error', 'One revision is already attempted! Can\\'t change status or delete this chapter now.')" style="cursor:pointer">
+            <select class="status-select" disabled style="opacity:0.4;pointer-events:none">
+              <option value="Not Started"${ch.status === "Not Started" ? " selected" : ""}>Not Started</option>
+              <option value="In Progress"${ch.status === "In Progress" ? " selected" : ""}>In Progress</option>
+              <option value="Completed"${ch.status === "Completed" ? " selected" : ""}>Completed</option>
+            </select>
+           </div>`
+    : `<select class="status-select" onchange="updateStatus('${ch.id}',this.value)">
+            <option value="Not Started"${ch.status === "Not Started" ? " selected" : ""}>Not Started</option>
+            <option value="In Progress"${ch.status === "In Progress" ? " selected" : ""}>In Progress</option>
+            <option value="Completed"${ch.status === "Completed" ? " selected" : ""}>Completed</option>
+           </select>`
+}
     </div>
     <div style="display:flex;gap:6px;margin-top:8px">
       <button class="btn btn-secondary btn-xs" style="flex:1" id="rev-btn-${ch.id}" onclick="toggleRevisions('${ch.id}')">📋 See Revisions</button>
-      <button class="btn btn-danger btn-xs" style="flex:1" onclick="deleteChapter('${ch.id}')">🗑 Delete Chapter</button>
+      ${
+        !isLocked
+          ? `<button class="btn btn-danger btn-xs" style="flex:1" onclick="deleteChapter('${ch.id}')">🗑 Delete Chapter</button>`
+          : `<button class="btn btn-danger btn-xs" style="flex:1;opacity:0.4" onclick="showToast('Revision attempted! 🔒', 'error', 'One revision is already attempted! Can\\'t change status or delete this chapter now.')">🗑 Delete Chapter</button>`
+      }
     </div>
     <div id="rev-expand-${ch.id}" style="display:none;margin-top:10px">
       <div class="see-rev-section">
@@ -1480,15 +1521,17 @@ function chapterCard(ch) {
 // ── MODAL ──
 function showNotifModal() {
   const t = todayStr();
-  const due = revisions.filter((r) => r.dueDate === t && !r.done);
-  if (due.length === 0) return;
-  let html = "";
-  due.forEach((r) => {
-    html += `<li class="notif-item">
+const due = revisions.filter(
+  (r) => r.dueDate === t && !r.done && !r.missedPermanently,
+);
+if (due.length === 0) return;
+let html = "";
+due.forEach((r) => {
+  html += `<li class="notif-item">
       <div><p class="nname">${sanitize(r.chapterName)}</p><p class="nsub">${sanitize(r.subject)} · +${r.dayOffset} day · ${coinForOffset(r.dayOffset)}🪙</p></div>
       <span class="ntag">Due Today</span>
     </li>`;
-  });
+});
   document.getElementById("notifList").innerHTML = html;
   document.getElementById("notifModal").classList.remove("hidden");
 }
@@ -1648,51 +1691,52 @@ async function joinGroup() {
 }
 
 async function leaveGroup() {
-  if (!confirm("Leave this group? Your local data stays safe.")) return;
-  if (lbUnsubscribe) {
-    lbUnsubscribe();
-    lbUnsubscribe = null;
-  }
-  if (activityUnsubscribe) {
-    activityUnsubscribe();
-    activityUnsubscribe = null;
-  }
-  if (groupNameUnsubscribe) {
-    groupNameUnsubscribe();
-    groupNameUnsubscribe = null;
-  }
-
-  // Remove this device/user from Firestore so others see real-time removal
-  try {
-    if (groupCode && db && memberId) {
-      await db
-        .collection("groups")
-        .doc(groupCode)
-        .collection("members")
-        .doc(memberId)
-        .delete();
+  showConfirmModal("Do you really want to leave this group?", async () => {
+    if (lbUnsubscribe) {
+      lbUnsubscribe();
+      lbUnsubscribe = null;
     }
-  } catch (e) {
-    console.log("Leave group delete error:", e);
-  }
-  groupCode = "";
-  groupName = "";
-  groupDisplayName = "";
-  isCreator = false;
-  localStorage.removeItem("st_group");
-  localStorage.removeItem("st_grpname");
-  localStorage.removeItem("st_isCreator");
-  localStorage.removeItem("st_groupDisplayName");
-  document.getElementById("groupMain").style.display = "none";
-  document.getElementById("groupSetup").style.display = "block";
-  document.getElementById("joinGroupPanel").style.display = "none";
-  document.getElementById("grp-groupname-field").style.display = "";
-  playLeaveGroupSound();
-  showToast(
-    "Akela rahi... 🚶‍♂️💔",
-    "",
-    "Group chhod diya par padhai mat chhodna!",
-  );
+    if (activityUnsubscribe) {
+      activityUnsubscribe();
+      activityUnsubscribe = null;
+    }
+    if (groupNameUnsubscribe) {
+      groupNameUnsubscribe();
+      groupNameUnsubscribe = null;
+    }
+
+    // Remove this device/user from Firestore so others see real-time removal
+    try {
+      if (groupCode && db && memberId) {
+        await db
+          .collection("groups")
+          .doc(groupCode)
+          .collection("members")
+          .doc(memberId)
+          .delete();
+      }
+    } catch (e) {
+      console.log("Leave group delete error:", e);
+    }
+    groupCode = "";
+    groupName = "";
+    groupDisplayName = "";
+    isCreator = false;
+    localStorage.removeItem("st_group");
+    localStorage.removeItem("st_grpname");
+    localStorage.removeItem("st_isCreator");
+    localStorage.removeItem("st_groupDisplayName");
+    document.getElementById("groupMain").style.display = "none";
+    document.getElementById("groupSetup").style.display = "block";
+    document.getElementById("joinGroupPanel").style.display = "none";
+    document.getElementById("grp-groupname-field").style.display = "flex";
+    playLeaveGroupSound();
+    showToast(
+      "Akela rahi... 🚶‍♂️💔",
+      "",
+      "Group chhod diya par padhai mat chhodna!",
+    );
+  });
 }
 function copyGroupCode() {
   navigator.clipboard
