@@ -37,16 +37,43 @@
           <label>Your Name</label
           ><input type="text" id="ob-name" placeholder="e.g. George" />
         </div>
-        <div class="field">
+       <div class="field">
           <label>Class</label>
           <select id="ob-class">
-            <option value="9">Class 9 (ICSE)</option>
             <option value="10">Class 10 (ICSE)</option>
-            <option value="other">Other</option>
+            <option value="other">Other (no syllabus autofill)</option>
           </select>
         </div>
         <div class="field">
-          <label>Exam Date (optional)</label><input type="date" id="ob-exam" />
+          <label>Stream</label>
+          <select id="ob-stream">
+            <option value="science">Science (Physics, Chemistry, Biology)</option>
+            <option value="commerce">Commerce</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Second Language</label>
+          <select id="ob-lang2">
+            <option value="hindi">Hindi</option>
+            <option value="bengali">Bengali</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Group III Elective</label>
+          <select id="ob-elective">
+            <option value="computer">Computer Applications</option>
+            <option value="eco_apps">Economic Applications</option>
+            <option value="physical_ed">Physical Education</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Exam Date (optional)</label>
+          <input type="date" id="ob-exam" oninput="updateDeadlineLimits()" />
+        </div>
+        <div class="field" id="ob-deadline-field" style="display:none">
+          <label>Syllabus Completion Deadline</label>
+          <input type="date" id="ob-deadline" />
+          <div id="ob-deadline-hint" style="font-size:0.7rem;color:var(--text2);margin-top:5px;font-family:'Baloo 2',sans-serif"></div>
         </div>
         <button class="btn btn-primary full" onclick="finishOnboard()">
           Let's Go 🚀
@@ -103,7 +130,7 @@
           </button>
           <div>
             <h1>Study Tracker</h1>
-            <p class="greeting" id="greeting">Track · Revise · Excel</p>
+            <p class="greeting" id="greeting"></p>
           </div>
         </div>
         <div class="header-right">
@@ -118,6 +145,7 @@
         <button class="tab-btn" data-tab="done" onclick="switchTab(event, 'done')">Done</button>
         <button class="tab-btn" data-tab="group" onclick="switchTab(event, 'group')">👥 Group</button>
         <button class="tab-btn" data-tab="add" onclick="switchTab(event, 'add')">➕ Add</button>
+     <button class="tab-btn" data-tab="progress" onclick="switchTab(event, 'progress')">📊 Progress</button>
         <button class="tab-btn red-tab" data-tab="weak" onclick="switchTab(event, 'weak')">⚠ Weak</button>
       </div>
     </header>
@@ -286,7 +314,7 @@
           <div class="form-grid">
             <div class="field">
               <label>Subject</label>
-              <select id="subjectSelect"></select>
+             <select id="subjectSelect" onchange="updateChapterSuggestions()"></select>
             </div>
             <div class="field">
               <label>Add Custom Subject</label>
@@ -303,12 +331,15 @@
                 </button>
               </div>
             </div>
-            <div class="field">
+          <div class="field">
               <label>Chapter Name</label>
+              <select id="chapterNameSelect" onchange="onChapterSelectChange()" style="display:block"></select>
               <input
                 type="text"
                 id="chapterName"
-                placeholder="e.g. Trigonometry"
+                placeholder="Type custom chapter name"
+                autocomplete="off"
+                style="display:none;margin-top:6px"
               />
             </div>
             <div class="field">
@@ -338,6 +369,15 @@
             </div>
           </div>
         </div>
+      </div>
+<!-- ── PROGRESS TAB ── -->
+      <div id="tab-progress" class="tab-content">
+        <div id="prog-readiness-block"></div>
+        <div id="prog-pace-block"></div>
+        <div id="prog-syllabus-block"></div>
+        <div id="prog-subjects-block"></div>
+        <div id="prog-revisions-block"></div>
+        <div id="prog-report-block"></div>
       </div>
 
       <!-- ── WEAK TAB ── -->
@@ -397,12 +437,35 @@
           <div class="field"><label>Name</label><input type="text" id="prof-name" placeholder="Your name" disabled /></div>
           <div class="field"><label>Class</label>
             <select id="prof-class" disabled>
-              <option value="9">Class 9 (ICSE)</option>
               <option value="10">Class 10 (ICSE)</option>
               <option value="other">Other</option>
             </select>
           </div>
-          <div class="field"><label>Exam Date</label><input type="date" id="prof-exam" disabled /></div>
+          <div class="field"><label>Exam Date</label><input type="date" id="prof-exam" oninput="updateProfileDeadlineLimits()" disabled /></div>
+          <div class="field"><label>Stream</label>
+            <select id="prof-stream" disabled>
+              <option value="science">Science (Physics, Chemistry, Biology)</option>
+              <option value="commerce">Commerce</option>
+            </select>
+          </div>
+          <div class="field"><label>Second Language</label>
+            <select id="prof-lang2" disabled>
+              <option value="hindi">Hindi</option>
+              <option value="bengali">Bengali</option>
+            </select>
+          </div>
+          <div class="field"><label>Group III Elective</label>
+            <select id="prof-elective" disabled>
+              <option value="computer">Computer Applications</option>
+              <option value="eco_apps">Economic Applications</option>
+              <option value="physical_ed">Physical Education</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Study Deadline</label>
+            <input type="date" id="prof-deadline" disabled />
+            <div id="prof-deadline-hint" style="font-size:0.7rem;color:var(--text2);margin-top:5px;font-family:'Baloo 2',sans-serif;line-height:1.4"></div>
+          </div>
 
           <div id="profileEditActions" class="profile-edit-actions" style="display:none">
             <button class="btn btn-primary" style="flex:1" onclick="saveProfile()">💾 Save</button>
