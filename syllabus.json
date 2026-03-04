@@ -1,0 +1,429 @@
+{
+  "version": "2025-26",
+  "groups": {
+    "group1": {
+      "label": "Compulsory",
+      "subjects": {
+        "english_lang": {
+          "name": "English Language",
+          "book": "Total English",
+          "color": "#4f8ef7",
+          "chapters": [
+            { "id": "enl_01", "name": "Composition Writing" },
+            { "id": "enl_02", "name": "Letter Writing (Formal & Informal)" },
+            { "id": "enl_03", "name": "Notice & Email Writing" },
+            { "id": "enl_04", "name": "Unseen Comprehension Passage" },
+            { "id": "enl_05", "name": "Grammar & Usage" }
+          ]
+        },
+        "english_lit": {
+          "name": "English Literature",
+          "book": "Treasure Chest + Morning Star Julius Caesar",
+          "color": "#7c3aed",
+          "chapters": [
+            { "id": "lit_01", "name": "Julius Caesar — Act III" },
+            { "id": "lit_02", "name": "Julius Caesar — Act IV" },
+            { "id": "lit_03", "name": "Julius Caesar — Act V" },
+            {
+              "id": "lit_04",
+              "name": "With the Photographer — Stephen Leacock"
+            },
+            { "id": "lit_05", "name": "The Elevator — William Sleator" },
+            { "id": "lit_06", "name": "The Girl Who Can — Ama Ata Aidoo" },
+            { "id": "lit_07", "name": "The Pedestrian — Ray Bradbury" },
+            { "id": "lit_08", "name": "The Last Lesson — Alphonse Daudet" },
+            { "id": "lit_09", "name": "Haunted Houses — H.W. Longfellow" },
+            { "id": "lit_10", "name": "The Glove and the Lions — Leigh Hunt" },
+            { "id": "lit_11", "name": "When Great Trees Fall — Maya Angelou" },
+            { "id": "lit_12", "name": "A Considerable Speck — Robert Frost" },
+            { "id": "lit_13", "name": "The Power of Music — Sukumar Ray" }
+          ]
+        },
+        "history": {
+          "name": "History",
+          "book": "APC Modern Indian History",
+          "color": "#d97706",
+          "chapters": [
+            { "id": "his_01", "name": "The First War of Independence, 1857" },
+            { "id": "his_02", "name": "Growth of Nationalism" },
+            {
+              "id": "his_03",
+              "name": "First Phase of the Indian National Movement (1885–1907)"
+            },
+            {
+              "id": "his_04",
+              "name": "Second Phase of the Indian National Movement (1905–1916)"
+            },
+            { "id": "his_05", "name": "The Muslim League" },
+            {
+              "id": "his_06",
+              "name": "Mahatma Gandhi and the National Movement"
+            },
+            { "id": "his_07", "name": "Quit India Movement" },
+            { "id": "his_08", "name": "Forward Bloc and The INA" },
+            { "id": "his_09", "name": "Independence and Partition of India" },
+            { "id": "his_10", "name": "The First World War" },
+            { "id": "his_11", "name": "Rise of Dictatorships" },
+            { "id": "his_12", "name": "The Second World War" },
+            { "id": "his_13", "name": "United Nations" },
+            { "id": "his_14", "name": "Major Agencies of the United Nations" },
+            { "id": "his_15", "name": "Non-Aligned Movement" }
+          ]
+        },
+        "civics": {
+          "name": "Civics",
+          "book": "APC Modern Indian History",
+          "color": "#b45309",
+          "chapters": [
+            {
+              "id": "civ_01",
+              "name": "The Union Parliament (Lok Sabha & Rajya Sabha)"
+            },
+            { "id": "civ_02", "name": "The President and The Vice-President" },
+            {
+              "id": "civ_03",
+              "name": "Prime Minister and Council of Ministers"
+            },
+            { "id": "civ_04", "name": "The Supreme Court" },
+            { "id": "civ_05", "name": "The High Courts and Subordinate Courts" }
+          ]
+        },
+        "geography": {
+          "name": "Geography",
+          "book": "Frank Modern Certificate Geography Part II",
+          "color": "#059669",
+          "chapters": [
+            {
+              "id": "geo_01",
+              "name": "Map Study: Interpretation of Topographical Maps"
+            },
+            { "id": "geo_02", "name": "Maps of India" },
+            {
+              "id": "geo_03",
+              "name": "Location, Extent and Physical Features of India"
+            },
+            { "id": "geo_04", "name": "Climate of India" },
+            { "id": "geo_05", "name": "Soils in India" },
+            { "id": "geo_06", "name": "Natural Vegetation of India" },
+            { "id": "geo_07", "name": "Water Resources" },
+            { "id": "geo_08", "name": "Minerals in India" },
+            { "id": "geo_09", "name": "India — Energy Resources" },
+            { "id": "geo_10", "name": "Agriculture in India" },
+            {
+              "id": "geo_11",
+              "name": "Food Crops (Rice, Wheat, Millets, Pulses)"
+            },
+            { "id": "geo_12", "name": "Commercial or Cash Crops" },
+            {
+              "id": "geo_13",
+              "name": "Distribution of Crops and Their Requirements"
+            },
+            { "id": "geo_14", "name": "Industries in India (Mineral Based)" },
+            { "id": "geo_15", "name": "Agro-Based Industries" },
+            { "id": "geo_16", "name": "Transport" },
+            { "id": "geo_17", "name": "Waste Management — I" },
+            { "id": "geo_18", "name": "Waste Management — II" }
+          ]
+        }
+      }
+    },
+    "lang2": {
+      "label": "Second Language",
+      "subjects": {
+        "hindi": {
+          "name": "Hindi",
+          "book": "Sahitya Sagar + Ekanki Sanchay",
+          "color": "#f59e0b",
+          "chapters": [
+            { "id": "hin_01", "name": "Baat Athanni Ki" },
+            { "id": "hin_02", "name": "Kaaki" },
+            { "id": "hin_03", "name": "Maha Yagya ka Puraskar" },
+            { "id": "hin_04", "name": "Neta Ji ka Chashma" },
+            { "id": "hin_05", "name": "Apna Apna Bhagya — Jainendra Kumar" },
+            { "id": "hin_06", "name": "Do Kalakar — Mannu Bhandari" },
+            { "id": "hin_07", "name": "Bade Ghar Ki Beti — Premchand" },
+            { "id": "hin_08", "name": "Sandeh — Jaishankar Prasad" },
+            { "id": "hin_09", "name": "Jamun ka Ped — Krishna Chander" },
+            { "id": "hin_10", "name": "Bhed aur Bhediye — Harishankar Parsai" },
+            { "id": "hin_11", "name": "Sakhi — Kabirdas" },
+            {
+              "id": "hin_12",
+              "name": "Girdhar ki Kundaliyan — Girdhar Kaviray"
+            },
+            {
+              "id": "hin_13",
+              "name": "Swarg Bana Sakte Hain — Ramdhari Singh Dinkar"
+            },
+            {
+              "id": "hin_14",
+              "name": "Wah Janmbhoomi Meri — Sohanlal Dwivedi"
+            },
+            { "id": "hin_15", "name": "Megh Aaye — Sarveshwar Dayal Saxena" },
+            { "id": "hin_16", "name": "Sur ke Pad — Surdas" },
+            { "id": "hin_17", "name": "Vinay ke Pad — Tulsidas" },
+            { "id": "hin_18", "name": "Bhiksuk — Suryakant Tripathi Nirala" },
+            { "id": "hin_19", "name": "Sanskar aur Bhavna — Vishnu Prabhakar" },
+            { "id": "hin_20", "name": "Bahu ki Vida — Vinod Rastogi" },
+            {
+              "id": "hin_21",
+              "name": "Matribhoomi ka Maan — Hari Krishna Premi"
+            },
+            { "id": "hin_22", "name": "Sukhi Daali — Upendranath Ashk" },
+            {
+              "id": "hin_23",
+              "name": "Mahabharat ki Ek Sanjh — Bharat Bhushan Agrawal"
+            },
+            { "id": "hin_24", "name": "Deepdan — Ram Kumar Verma" },
+            { "id": "hin_25", "name": "Nibandh / Anuched Lekhan" },
+            { "id": "hin_26", "name": "Patra Lekhan" },
+            { "id": "hin_27", "name": "Apathit Gadyansh" },
+            {
+              "id": "hin_28",
+              "name": "Vyakaran (Sandhi, Samas, Muhavare, Vakya)"
+            }
+          ]
+        },
+        "bengali": {
+          "name": "Bengali",
+          "book": "Sonkolita",
+          "color": "#10b981",
+          "chapters": [
+            { "id": "ben_01", "name": "Ginni (Story)" },
+            { "id": "ben_02", "name": "Lalu (Story)" },
+            { "id": "ben_03", "name": "Bama (Story)" },
+            { "id": "ben_04", "name": "Canvaser (Story)" },
+            { "id": "ben_05", "name": "Naam (Story)" },
+            { "id": "ben_06", "name": "Ashohojogi (Story)" },
+            { "id": "ben_07", "name": "Debotar Jonmo (Story)" },
+            { "id": "ben_08", "name": "Nil Manusher Kahini (Story)" },
+            { "id": "ben_09", "name": "Gondhota Khub Sondheyojonok (Story)" },
+            { "id": "ben_10", "name": "Lokti (Story)" },
+            { "id": "ben_11", "name": "Bongobhumir Proti (Poem)" },
+            { "id": "ben_12", "name": "Sobhotar Proti (Poem)" },
+            { "id": "ben_13", "name": "Kuli-Mojur (Poem)" },
+            { "id": "ben_14", "name": "Abar Asibo Fire (Poem)" },
+            { "id": "ben_15", "name": "Siri (Poem)" },
+            { "id": "ben_16", "name": "Rabindranather Proti (Poem)" },
+            { "id": "ben_17", "name": "Phool Futuk Na Futuk (Poem)" },
+            { "id": "ben_18", "name": "Amolkanti (Poem)" },
+            { "id": "ben_19", "name": "Babu Bollen (Poem)" },
+            { "id": "ben_20", "name": "Kho Kho (Poem)" },
+            { "id": "ben_21", "name": "Unseen Comprehension (Apathit Bodh)" },
+            { "id": "ben_22", "name": "Essay & Composition (Rachana)" },
+            { "id": "ben_23", "name": "Grammar (Vyakaran)" }
+          ]
+        }
+      }
+    },
+    "group2": {
+      "label": "Group II",
+      "subjects": {
+        "physics": {
+          "name": "Physics",
+          "book": "Selina Concise Physics",
+          "color": "#3b82f6",
+          "chapters": [
+            { "id": "phy_01", "name": "Force" },
+            { "id": "phy_02", "name": "Work, Energy and Power" },
+            { "id": "phy_03", "name": "Machines" },
+            { "id": "phy_04", "name": "Refraction of Light at Plane Surfaces" },
+            { "id": "phy_05", "name": "Refraction through a Lens" },
+            { "id": "phy_06", "name": "Spectrum" },
+            { "id": "phy_07", "name": "Sound" },
+            { "id": "phy_08", "name": "Current Electricity" },
+            { "id": "phy_09", "name": "Household Circuits" },
+            { "id": "phy_10", "name": "Electro-Magnetism" },
+            { "id": "phy_11", "name": "Calorimetry" },
+            { "id": "phy_12", "name": "Radioactivity" }
+          ]
+        },
+        "chemistry": {
+          "name": "Chemistry",
+          "book": "Dalal New Simplified Chemistry",
+          "color": "#8b5cf6",
+          "chapters": [
+            {
+              "id": "che_01",
+              "name": "Periodic Table and Periodic Properties"
+            },
+            { "id": "che_02", "name": "Chemical Bonding" },
+            { "id": "che_03", "name": "Acids, Bases and Salts" },
+            { "id": "che_04", "name": "Analytical Chemistry" },
+            {
+              "id": "che_05",
+              "name": "Mole Concept and Stoichiometry — Part A"
+            },
+            {
+              "id": "che_06",
+              "name": "Mole Concept and Stoichiometry — Part B"
+            },
+            { "id": "che_07", "name": "Electrolysis" },
+            { "id": "che_08", "name": "Metallurgy" },
+            {
+              "id": "che_09",
+              "name": "Study of Compounds — Hydrogen Chloride"
+            },
+            { "id": "che_10", "name": "Study of Compounds — Ammonia" },
+            { "id": "che_11", "name": "Study of Compounds — Nitric Acid" },
+            { "id": "che_12", "name": "Study of Compounds — Sulphuric Acid" },
+            { "id": "che_13", "name": "Organic Chemistry" }
+          ]
+        },
+        "biology": {
+          "name": "Biology",
+          "book": "Selina Concise Biology",
+          "color": "#22c55e",
+          "chapters": [
+            {
+              "id": "bio_01",
+              "name": "Cell: The Structural and Functional Unit of Life"
+            },
+            {
+              "id": "bio_02",
+              "name": "Structure of Chromosome, Cell Cycle and Cell Division"
+            },
+            { "id": "bio_03", "name": "Genetics: Some Basic Fundamentals" },
+            { "id": "bio_04", "name": "Absorption by Roots" },
+            { "id": "bio_05", "name": "Transpiration" },
+            { "id": "bio_06", "name": "Photosynthesis" },
+            { "id": "bio_07", "name": "Chemical Coordination in Plants" },
+            { "id": "bio_08", "name": "The Circulatory System" },
+            { "id": "bio_09", "name": "The Excretory System" },
+            { "id": "bio_10", "name": "The Nervous System" },
+            { "id": "bio_11", "name": "Sense Organs" },
+            { "id": "bio_12", "name": "The Endocrine System" },
+            { "id": "bio_13", "name": "The Reproductive System" },
+            { "id": "bio_14", "name": "Human Evolution" },
+            {
+              "id": "bio_15",
+              "name": "Population: The Increasing Numbers and Rising Problems"
+            },
+            {
+              "id": "bio_16",
+              "name": "Pollution: A Rising Environmental Problem"
+            }
+          ]
+        },
+        "maths": {
+          "name": "Mathematics",
+          "book": "Selina Concise Mathematics",
+          "color": "#f43f5e",
+          "chapters": [
+            { "id": "mat_01", "name": "GST (Goods and Services Tax)" },
+            { "id": "mat_02", "name": "Banking (Recurring Deposit Accounts)" },
+            { "id": "mat_03", "name": "Shares and Dividends" },
+            { "id": "mat_04", "name": "Linear Inequations" },
+            { "id": "mat_05", "name": "Quadratic Equations" },
+            { "id": "mat_06", "name": "Problems Based on Quadratic Equations" },
+            { "id": "mat_07", "name": "Ratio and Proportion" },
+            { "id": "mat_08", "name": "Remainder and Factor Theorems" },
+            { "id": "mat_09", "name": "Matrices" },
+            { "id": "mat_10", "name": "Arithmetic Progression (AP)" },
+            { "id": "mat_11", "name": "Geometric Progression (GP)" },
+            { "id": "mat_12", "name": "Reflection" },
+            { "id": "mat_13", "name": "Section and Midpoint Formula" },
+            { "id": "mat_14", "name": "Equation of a Line" },
+            { "id": "mat_15", "name": "Similarity" },
+            { "id": "mat_16", "name": "Loci" },
+            { "id": "mat_17", "name": "Circles — Angle and Cyclic Properties" },
+            { "id": "mat_18", "name": "Tangents and Intersecting Chords" },
+            { "id": "mat_19", "name": "Constructions (Circles)" },
+            { "id": "mat_20", "name": "Cylinder, Cone and Sphere" },
+            { "id": "mat_21", "name": "Trigonometrical Identities" },
+            { "id": "mat_22", "name": "Heights and Distances" },
+            {
+              "id": "mat_23",
+              "name": "Graphical Representation (Histogram, Ogive)"
+            },
+            {
+              "id": "mat_24",
+              "name": "Measures of Central Tendency (Mean, Median, Mode)"
+            },
+            { "id": "mat_25", "name": "Probability" }
+          ]
+        },
+        "commerce": {
+          "name": "Commercial Studies",
+          "book": "TBD",
+          "color": "#f97316",
+          "chapters": []
+        },
+        "economics_g2": {
+          "name": "Economics",
+          "book": "TBD",
+          "color": "#06b6d4",
+          "chapters": []
+        }
+      }
+    },
+    "group3": {
+      "label": "Elective",
+      "subjects": {
+        "computer": {
+          "name": "Computer Applications",
+          "book": "APC Understanding Computer Applications with BlueJ",
+          "color": "#6366f1",
+          "chapters": [
+            {
+              "id": "com_01",
+              "name": "Introduction to Object-Oriented Programming"
+            },
+            {
+              "id": "com_02",
+              "name": "Elementary Concept of Objects and Classes"
+            },
+            { "id": "com_03", "name": "Values and Data Types" },
+            { "id": "com_04", "name": "Operators in Java" },
+            { "id": "com_05", "name": "Introduction to Java (BlueJ)" },
+            { "id": "com_06", "name": "Input in Java" },
+            { "id": "com_07", "name": "Mathematical Library Methods" },
+            {
+              "id": "com_08",
+              "name": "Conditional Statements (if, if-else, switch)"
+            },
+            {
+              "id": "com_09",
+              "name": "Iterative Constructs (for, while, do-while)"
+            },
+            { "id": "com_10", "name": "Nested Loops" },
+            { "id": "com_11", "name": "Library Classes" },
+            { "id": "com_12", "name": "Single Dimensional Arrays" },
+            { "id": "com_13", "name": "Double Dimensional Arrays" },
+            { "id": "com_14", "name": "String Handling" },
+            { "id": "com_15", "name": "User-Defined Methods" },
+            { "id": "com_16", "name": "Class as the Basis of All Computation" },
+            { "id": "com_17", "name": "Encapsulation and Inheritance" }
+          ]
+        },
+        "eco_apps": {
+          "name": "Economic Applications",
+          "book": "TBD",
+          "color": "#14b8a6",
+          "chapters": []
+        },
+        "physical_ed": {
+          "name": "Physical Education",
+          "book": "Saraswati Health & Physical Education",
+          "color": "#84cc16",
+          "chapters": [
+            { "id": "pe_01", "name": "Human Growth and Development" },
+            {
+              "id": "pe_02",
+              "name": "Physical Fitness, Wellness and Lifestyle"
+            },
+            { "id": "pe_03", "name": "Skeletal System" },
+            { "id": "pe_04", "name": "Muscular System" },
+            { "id": "pe_05", "name": "Circulatory System" },
+            { "id": "pe_06", "name": "Respiratory System" },
+            { "id": "pe_07", "name": "Nutrition and Dietetics" },
+            { "id": "pe_08", "name": "Health Education and Health Services" },
+            { "id": "pe_09", "name": "First Aid and Safety" },
+            { "id": "pe_10", "name": "Training Methods and Principles" },
+            { "id": "pe_11", "name": "Sports Psychology" },
+            { "id": "pe_12", "name": "Careers in Physical Education" }
+          ]
+        }
+      }
+    }
+  }
+}
