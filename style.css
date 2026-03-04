@@ -147,6 +147,15 @@ h1, h2, h3, .section-title, .drawer-title,
   -webkit-appearance: auto;
   transition: border-color 0.2s;
 }
+.field input[list] {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none !important;
+}
+.field input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+  opacity: 0 !important;
+}
 .field input:focus,
 .field select:focus { border-color: var(--indigo); }
 
@@ -250,7 +259,7 @@ h1, h2, h3, .section-title, .drawer-title,
   padding: 14px 16px 10px;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 410;
   box-shadow: 0 4px 24px rgba(0,0,0,0.6);
 }
 .header-top {
@@ -1025,7 +1034,7 @@ main {
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 400;
+  z-index: 420;
   background: rgba(0,0,0,0.7);
   backdrop-filter: blur(4px);
   opacity: 0;
@@ -1040,7 +1049,7 @@ main {
 /* warm ink sidebar */
  background: linear-gradient(180deg, #0a0510 0%, #06030c 40%, #080410 100%);
   border-right: 1px solid rgba(194,118,42,0.2);
-  z-index: 401;
+  z-index: 421;
   transform: translateX(-100%);
   transition: transform 0.18s cubic-bezier(.4,0,.2,1);
   display: flex;
@@ -1354,4 +1363,27 @@ main {
   border-radius: var(--radius-sm);
   margin: 6px 0 0;
   font-family: 'Tiro Devanagari Sanskrit', serif;
+}
+/* ── PROGRESS TAB ── */
+#tab-progress {
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+}
+#tab-progress.active {
+  display: flex;
+}
+/* ── CUSTOM CHAPTER BADGE ── */
+.custom-badge {
+  display: inline-block;
+  background: rgba(194, 118, 42, 0.12);
+  color: var(--indigo);
+  font-size: 0.62rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-left: 5px;
+  border: 1px solid rgba(194, 118, 42, 0.25);
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
