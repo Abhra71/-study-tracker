@@ -141,12 +141,10 @@
  <div class="tabs">
         <button class="tab-btn active" data-tab="today" onclick="switchTab(event, 'today')">Today</button>
         <button class="tab-btn" data-tab="chapters" onclick="switchTab(event, 'chapters')">Chapters</button>
+        <button class="tab-btn" data-tab="add" onclick="switchTab(event, 'add')">➕ Add</button>
+        <button class="tab-btn" data-tab="progress" onclick="switchTab(event, 'progress')">📊 Progress</button>
         <button class="tab-btn" data-tab="calendar" onclick="switchTab(event, 'calendar')">Calendar</button>
         <button class="tab-btn" data-tab="done" onclick="switchTab(event, 'done')">Done</button>
-        <button class="tab-btn" data-tab="group" onclick="switchTab(event, 'group')">👥 Group</button>
-        <button class="tab-btn" data-tab="add" onclick="switchTab(event, 'add')">➕ Add</button>
-     <button class="tab-btn" data-tab="progress" onclick="switchTab(event, 'progress')">📊 Progress</button>
-        <button class="tab-btn red-tab" data-tab="weak" onclick="switchTab(event, 'weak')">⚠ Weak</button>
       </div>
     </header>
 
@@ -394,7 +392,7 @@
     <div id="profileOverlay" onclick="closeProfile()"></div>
     <div id="profileDrawer">
       <div class="drawer-header">
-        <div class="drawer-title">👤 My Profile</div>
+        <div class="drawer-title">Study Tracker</div>
         <button class="drawer-close" onclick="closeProfile()">✕</button>
       </div>
       <div class="drawer-body">
@@ -427,59 +425,68 @@
           <span class="ec-label">📅 Exam in</span>
           <span class="ec-days" id="prof-exam-days">—</span>
         </div>
-        <!-- edit form -->
-        <div id="profileEditBlock" class="profile-readonly">
-          <div class="profile-edit-head">
-            <div class="drawer-section-label" style="margin-bottom:0">Edit Profile</div>
-            <button class="icon-btn" id="editProfileBtn" onclick="toggleProfileEdit()">✏️ Edit</button>
-          </div>
-
-          <div class="field"><label>Name</label><input type="text" id="prof-name" placeholder="Your name" disabled /></div>
-          <div class="field"><label>Class</label>
-            <select id="prof-class" disabled>
-              <option value="10">Class 10 (ICSE)</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div class="field"><label>Exam Date</label><input type="date" id="prof-exam" oninput="updateProfileDeadlineLimits()" disabled /></div>
-          <div class="field"><label>Stream</label>
-            <select id="prof-stream" disabled>
-              <option value="science">Science (Physics, Chemistry, Biology)</option>
-              <option value="commerce">Commerce</option>
-            </select>
-          </div>
-          <div class="field"><label>Second Language</label>
-            <select id="prof-lang2" disabled>
-              <option value="hindi">Hindi</option>
-              <option value="bengali">Bengali</option>
-            </select>
-          </div>
-          <div class="field"><label>Group III Elective</label>
-            <select id="prof-elective" disabled>
-              <option value="computer">Computer Applications</option>
-              <option value="eco_apps">Economic Applications</option>
-              <option value="physical_ed">Physical Education</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Study Deadline</label>
-            <input type="date" id="prof-deadline" disabled />
-            <div id="prof-deadline-hint" style="font-size:0.7rem;color:var(--text2);margin-top:5px;font-family:'Baloo 2',sans-serif;line-height:1.4"></div>
-          </div>
-
-          <div id="profileEditActions" class="profile-edit-actions" style="display:none">
-            <button class="btn btn-primary" style="flex:1" onclick="saveProfile()">💾 Save</button>
-            <button class="btn btn-secondary" style="flex:1" onclick="cancelProfileEdit()">Cancel</button>
-          </div>
-        </div>
-        <!-- group info -->
-        <div>
-          <div class="drawer-section-label">Group</div>
-          <div class="group-info-block" id="prof-group-info">
-            <strong>Status</strong>Not in any group.
+        <!-- profile accordion -->
+        <button class="drawer-nav-row" onclick="toggleDrawerAccordion('acc-profile')">
+          <span class="drawer-nav-icon">👤</span>
+          <span class="drawer-nav-label">Profile</span>
+          <span class="acc-chevron" id="acc-profile-chevron">›</span>
+        </button>
+        <div id="acc-profile" style="display:none;border:1px solid rgba(194,118,42,0.12);border-top:none;border-radius:0 0 10px 10px;background:rgba(0,0,0,0.15);padding:14px;">
+          <div id="profileEditBlock" class="profile-readonly">
+            <div class="profile-edit-head">
+              <div class="drawer-section-label" style="margin-bottom:0">Your Details</div>
+              <button class="icon-btn" id="editProfileBtn" onclick="toggleProfileEdit()">✏️ Edit</button>
+            </div>
+            <div class="field"><label>Name</label><input type="text" id="prof-name" placeholder="Your name" disabled /></div>
+            <div class="field"><label>Class</label>
+              <select id="prof-class" disabled>
+                <option value="10">Class 10 (ICSE)</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="field"><label>Exam Date</label><input type="date" id="prof-exam" oninput="updateProfileDeadlineLimits()" disabled /></div>
+            <div class="field"><label>Stream</label>
+              <select id="prof-stream" disabled>
+                <option value="science">Science (Physics, Chemistry, Biology)</option>
+                <option value="commerce">Commerce</option>
+              </select>
+            </div>
+            <div class="field"><label>Second Language</label>
+              <select id="prof-lang2" disabled>
+                <option value="hindi">Hindi</option>
+                <option value="bengali">Bengali</option>
+              </select>
+            </div>
+            <div class="field"><label>Group III Elective</label>
+              <select id="prof-elective" disabled>
+                <option value="computer">Computer Applications</option>
+                <option value="eco_apps">Economic Applications</option>
+                <option value="physical_ed">Physical Education</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Study Deadline</label>
+              <input type="date" id="prof-deadline" disabled />
+              <div id="prof-deadline-hint" style="font-size:0.7rem;color:var(--text2);margin-top:5px;font-family:'Baloo 2',sans-serif;line-height:1.4"></div>
+            </div>
+            <div id="profileEditActions" class="profile-edit-actions" style="display:none">
+              <button class="btn btn-primary" style="flex:1" onclick="saveProfile()">💾 Save</button>
+              <button class="btn btn-secondary" style="flex:1" onclick="cancelProfileEdit()">Cancel</button>
+            </div>
           </div>
         </div>
-        <div style="height:8px"></div>
+        <!-- nav rows -->
+        <button class="drawer-nav-row" onclick="closeProfile();switchTabByName('group');renderGroup();">
+          <span class="drawer-nav-icon">👥</span>
+          <span class="drawer-nav-label">Group</span>
+          <span class="drawer-nav-arrow">›</span>
+        </button>
+        <button class="drawer-nav-row" onclick="closeProfile();switchTabByName('weak');renderWeak();">
+          <span class="drawer-nav-icon">⚠️</span>
+          <span class="drawer-nav-label">Weak Chapters</span>
+          <span class="drawer-nav-arrow">›</span>
+        </button>
+        <div style="height:16px"></div>
       </div>
     </div>
 
