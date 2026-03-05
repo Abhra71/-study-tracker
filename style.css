@@ -1229,6 +1229,41 @@ main {
   border-color: rgba(46,40,64,0.9);
 }
 .profile-edit-actions { display: flex; gap: 8px; margin-top: 8px; }
+.acc-chevron {
+  font-size: 1.1rem;
+  color: var(--text3);
+  transition: transform 0.22s cubic-bezier(0.4,0,0.2,1);
+  display: inline-block;
+}
+.acc-chevron.acc-open { transform: rotate(90deg); }
+
+/* ── DRAWER NAV ROWS ── */
+.drawer-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(194,118,42,0.12);
+  background: rgba(194,118,42,0.04);
+  color: var(--text2);
+  font-size: 0.82rem;
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.18s;
+}
+.drawer-nav-row:active {
+  background: rgba(194,118,42,0.12);
+  border-color: rgba(194,118,42,0.3);
+  color: var(--indigo);
+}
+.drawer-nav-icon { font-size: 1rem; flex-shrink: 0; }
+.drawer-nav-label { flex: 1; }
+.drawer-nav-arrow { font-size: 1.1rem; color: var(--text3); }
 
 /* ── CARD-RED explicit ── */
 .card-red { border-color: rgba(224,92,92,0.2) !important; }
