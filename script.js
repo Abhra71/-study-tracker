@@ -405,11 +405,11 @@ function fireNotification() {
   if (!("Notification" in window) || Notification.permission !== "granted")
     return;
   const t = todayStr();
-const due = revisions.filter(
-  (r) => r.dueDate === t && !r.done && !r.missedPermanently,
-);
-if (due.length === 0) return;
-const name = profile ? profile.name : "";
+  const due = revisions.filter(
+    (r) => r.dueDate === t && !r.done && !r.missedPermanently,
+  );
+  if (due.length === 0) return;
+  const name = profile ? profile.name : "";
   const names =
     due
       .slice(0, 3)
@@ -484,8 +484,8 @@ function checkSyllabusProfile() {
 }
 
 function finishSyllabusPrompt() {
-  profile.stream   = document.getElementById("ob-stream").value;
-  profile.lang2    = document.getElementById("ob-lang2").value;
+  profile.stream = document.getElementById("ob-stream").value;
+  profile.lang2 = document.getElementById("ob-lang2").value;
   profile.elective = document.getElementById("ob-elective").value;
   localStorage.setItem("st_profile", JSON.stringify(profile));
   localStorage.setItem("st_syllabus_prompted", "1");
@@ -495,58 +495,88 @@ function finishSyllabusPrompt() {
   populateSubjectDropdown();
   updateChapterSuggestions();
   renderAll();
-  showToast("Syllabus personalised! 🎓", "", "Progress tab now reflects your exact subjects.");
+  showToast(
+    "Syllabus personalised! 🎓",
+    "",
+    "Progress tab now reflects your exact subjects.",
+  );
 }
 function finishOnboard() {
   const name = document.getElementById("ob-name").value.trim();
   if (!name) {
-    showToast("Bina naam ke to bhoot bhi nahi aate! 👻🚫", "error", "Pehle apna naam likho.");
+    showToast(
+      "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+      "error",
+      "Pehle apna naam likho.",
+    );
     return;
   }
-  const cls      = document.getElementById("ob-class").value;
-  const exam     = document.getElementById("ob-exam").value;
-  const stream   = document.getElementById("ob-stream").value;
-  const lang2    = document.getElementById("ob-lang2").value;
+  const cls = document.getElementById("ob-class").value;
+  const exam = document.getElementById("ob-exam").value;
+  const stream = document.getElementById("ob-stream").value;
+  const lang2 = document.getElementById("ob-lang2").value;
   const elective = document.getElementById("ob-elective").value;
   const deadline = document.getElementById("ob-deadline").value;
   if (exam && deadline) {
     const err = _validateDeadline(deadline, exam);
-    if (err) { showToast(err, "error", "Invalid deadline"); return; }
+    if (err) {
+      showToast(err, "error", "Invalid deadline");
+      return;
+    }
   }
-  profile = { name, cls, examDate: exam, stream, lang2, elective, deadline: deadline || "" };
+  profile = {
+    name,
+    cls,
+    examDate: exam,
+    stream,
+    lang2,
+    elective,
+    deadline: deadline || "",
+    dateCreated: todayStr(),
+  };
   localStorage.setItem("st_profile", JSON.stringify(profile));
   document.getElementById("onboardOverlay").classList.add("hidden");
   loadSyllabusAndInit();
 }
 
 function _deadlineBounds(examDateStr) {
-  const examMs  = dateKeyToUTC(examDateStr);
-  const minMs   = examMs - 60 * 86400000; // earliest allowed = 60 days before exam
-  const maxMs   = examMs - 10 * 86400000; // latest allowed  = 10 days before exam
-  const toStr   = ms => {
+  const examMs = dateKeyToUTC(examDateStr);
+  const minMs = examMs - 60 * 86400000; // earliest allowed = 60 days before exam
+  const maxMs = examMs - 10 * 86400000; // latest allowed  = 10 days before exam
+  const toStr = (ms) => {
     const d = new Date(ms);
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
   };
-  const toLabel = ms => {
+  const toLabel = (ms) => {
     const d = new Date(ms);
-    return `${d.getUTCDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    return `${d.getUTCDate()} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   };
-  return { minDate: toStr(minMs), maxDate: toStr(maxMs), minLabel: toLabel(minMs), maxLabel: toLabel(maxMs) };
+  return {
+    minDate: toStr(minMs),
+    maxDate: toStr(maxMs),
+    minLabel: toLabel(minMs),
+    maxLabel: toLabel(maxMs),
+  };
 }
 
 function _validateDeadline(deadlineStr, examStr) {
   const { minDate, maxDate, minLabel, maxLabel } = _deadlineBounds(examStr);
-  if (deadlineStr < minDate) return `Too early — must be on or after ${minLabel} (2 months before exam).`;
-  if (deadlineStr > maxDate) return `Too close — must be on or before ${maxLabel} (10 days before exam).`;
+  if (deadlineStr < minDate)
+    return `Too early — must be on or after ${minLabel} (2 months before exam).`;
+  if (deadlineStr > maxDate)
+    return `Too close — must be on or before ${maxLabel} (10 days before exam).`;
   return null;
 }
 
 function updateDeadlineLimits() {
-  const exam  = document.getElementById("ob-exam").value;
+  const exam = document.getElementById("ob-exam").value;
   const field = document.getElementById("ob-deadline-field");
-  const hint  = document.getElementById("ob-deadline-hint");
-  const inp   = document.getElementById("ob-deadline");
-  if (!exam) { field.style.display = "none"; return; }
+  const hint = document.getElementById("ob-deadline-hint");
+  const inp = document.getElementById("ob-deadline");
+  if (!exam) {
+    field.style.display = "none";
+    return;
+  }
   field.style.display = "block";
   const { minDate, maxDate, minLabel, maxLabel } = _deadlineBounds(exam);
   inp.min = minDate;
@@ -557,7 +587,7 @@ function updateDeadlineLimits() {
 function updateProfileDeadlineLimits() {
   const exam = document.getElementById("prof-exam").value;
   const hint = document.getElementById("prof-deadline-hint");
-  const inp  = document.getElementById("prof-deadline");
+  const inp = document.getElementById("prof-deadline");
   if (!exam || !hint || !inp) return;
   const { minDate, maxDate, minLabel, maxLabel } = _deadlineBounds(exam);
   inp.min = minDate;
@@ -581,26 +611,26 @@ function updateGreeting() {
   const greet =
     h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
   const t = todayStr();
- const due = revisions.filter(
-   (r) => r.dueDate === t && !r.done && !r.missedPermanently,
- );
- const overdue = revisions.filter(
-   (r) => r.dueDate < t && !r.done && !r.missedPermanently,
- );
+  const due = revisions.filter(
+    (r) => r.dueDate === t && !r.done && !r.missedPermanently,
+  );
+  const overdue = revisions.filter(
+    (r) => r.dueDate < t && !r.done && !r.missedPermanently,
+  );
   let msg = `${greet}, ${profile.name}!`;
-const yesterday = addDays(t, -1);
-const grace = revisions.filter(
-  (r) =>
-    r.dueDate === yesterday &&
-    !r.done &&
-    !r.missedPermanently &&
-    isInGrace(yesterday),
-);
-if (grace.length > 0)
-  msg += ` ${grace.length} in grace + ${due.length} due today ⚠️`;
-else if (due.length > 0)
-  msg += ` ${due.length} revision${due.length > 1 ? "s" : ""} due today 💪`;
-else msg += " No revisions today 🎉";
+  const yesterday = addDays(t, -1);
+  const grace = revisions.filter(
+    (r) =>
+      r.dueDate === yesterday &&
+      !r.done &&
+      !r.missedPermanently &&
+      isInGrace(yesterday),
+  );
+  if (grace.length > 0)
+    msg += ` ${grace.length} in grace + ${due.length} due today ⚠️`;
+  else if (due.length > 0)
+    msg += ` ${due.length} revision${due.length > 1 ? "s" : ""} due today 💪`;
+  else msg += " No revisions today 🎉";
   document.getElementById("greeting").textContent = msg;
 }
 // ── STREAK ──
@@ -610,8 +640,12 @@ function updateStreak() {
 
   // Grace expiry check — only reset if grace has fully expired (not just missed yesterday)
   const graceExpired = isGraceExpired(yesterday);
-const yesterdayDue = revisions.filter((r) => r.dueDate === yesterday && !r.missedPermanently).length;
-  const yesterdayDone = revisions.filter((r) => r.dueDate === yesterday && r.done).length;
+  const yesterdayDue = revisions.filter(
+    (r) => r.dueDate === yesterday && !r.missedPermanently,
+  ).length;
+  const yesterdayDone = revisions.filter(
+    (r) => r.dueDate === yesterday && r.done,
+  ).length;
   const yesterdayAllDone = yesterdayDue === 0 || yesterdayDone >= yesterdayDue;
 
   if (graceExpired && !yesterdayAllDone && streak.lastDate !== t) {
@@ -622,7 +656,7 @@ const yesterdayDue = revisions.filter((r) => r.dueDate === yesterday && !r.misse
   // Increment streak — from today's due OR grace completions (once per day)
   const todayDone = revisions.filter((r) => r.dueDate === t && r.done).length;
   const graceCompletedToday = revisions.filter(
-    (r) => r.dueDate === yesterday && r.done && r.completedInGrace
+    (r) => r.dueDate === yesterday && r.done && r.completedInGrace,
   ).length;
 
   if ((todayDone > 0 || graceCompletedToday > 0) && streak.lastDate !== t) {
@@ -709,12 +743,21 @@ function processMissedRevisions() {
     });
     veryOld.forEach((r) => {
       // Auto-flag chapter as weak if it already has 1+ permanently missed revisions (this will be the 2nd)
-      const ch = chapters.find(c => c.id === r.chapterId);
+      const ch = chapters.find((c) => c.id === r.chapterId);
       if (ch && !ch.isWeak) {
-        const alreadyMissed = revisions.filter(rv => rv.chapterId === r.chapterId && rv.missedPermanently && rv.id !== r.id).length;
+        const alreadyMissed = revisions.filter(
+          (rv) =>
+            rv.chapterId === r.chapterId &&
+            rv.missedPermanently &&
+            rv.id !== r.id,
+        ).length;
         if (alreadyMissed >= 1) {
           ch.isWeak = true;
-          showToast("⚠ Auto-flagged Weak!", "warn", `"${ch.name}" missed 2+ revisions — auto-marked as weak.`);
+          showToast(
+            "⚠ Auto-flagged Weak!",
+            "warn",
+            `"${ch.name}" missed 2+ revisions — auto-marked as weak.`,
+          );
         }
       }
       r.missedPermanently = true;
@@ -817,12 +860,12 @@ function switchTab(e, name) {
     .forEach((b) => b.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
   e.currentTarget.classList.add("active");
-if (name === "group") {
-  renderGroup();
-}
-if (name === "weak") renderWeak();
-if (name === "chapters") renderSubjectGrid();
-if (name === "progress") renderProgress();
+  if (name === "group") {
+    renderGroup();
+  }
+  if (name === "weak") renderWeak();
+  if (name === "chapters") renderSubjectGrid();
+  if (name === "progress") renderProgress();
 }
 
 // ── SUBJECTS ──
@@ -887,9 +930,12 @@ function addChapter() {
   const subject = document.getElementById("subjectSelect").value;
   const sel = document.getElementById("chapterNameSelect");
   const inp = document.getElementById("chapterName");
-  const name = (sel && sel.style.display !== "none" && sel.value !== "__custom__")
-    ? sel.value.trim()
-    : (inp ? inp.value.trim() : "");
+  const name =
+    sel && sel.style.display !== "none" && sel.value !== "__custom__"
+      ? sel.value.trim()
+      : inp
+        ? inp.value.trim()
+        : "";
   const status = document.getElementById("chapterStatus").value;
   const isWeak = document.getElementById("weakToggle").checked;
   if (!name) {
@@ -902,20 +948,22 @@ function addChapter() {
   }
   // Block duplicate: same subject + same name (case-insensitive)
   const alreadyExists = chapters.some(
-    c => c.subject === subject && c.name.trim().toLowerCase() === name.trim().toLowerCase()
+    (c) =>
+      c.subject === subject &&
+      c.name.trim().toLowerCase() === name.trim().toLowerCase(),
   );
   if (alreadyExists) {
     showToast(
       "Ye chapter toh pehle se hai! 🔁😅",
       "error",
-      `"${name}" is already added under ${subject}.`
+      `"${name}" is already added under ${subject}.`,
     );
     return;
   }
   // Check if this chapter exists in the preloaded syllabus
   let isCustom = true;
   if (window._syllabus) {
-   const aliases = { "History & Civics": ["Civics", "History"] };
+    const aliases = { "History & Civics": ["Civics", "History"] };
     const lookFor = aliases[subject] || [subject];
     outer: for (const group of Object.values(window._syllabus.groups)) {
       for (const subj of Object.values(group.subjects)) {
@@ -999,33 +1047,33 @@ function markRevDone(id) {
       : document.querySelector(`button[onclick*="${id}"]`);
   const originRect = originEl ? originEl.getBoundingClientRect() : null;
 
-rev.done = true;
-rev.completedOn = todayStr();
+  rev.done = true;
+  rev.completedOn = todayStr();
 
-const earned = coinForOffset(rev.dayOffset);
-if (earned > 0) {
-  coins = (coins || 0) + earned;
-}
-rev.earnedCoins = earned;
-
-save();
-renderAll();
-
-playDoneSound();
-if (earned > 0) {
-  setTimeout(playCoinSound, 90);
-  if (originRect) {
-    setTimeout(() => flyCoinsFromRect(originRect, earned), 120);
+  const earned = coinForOffset(rev.dayOffset);
+  if (earned > 0) {
+    coins = (coins || 0) + earned;
   }
-}
+  rev.earnedCoins = earned;
 
-showToast(
-  `Shabash sher! 🦁💰`,
-  "",
-  earned > 0
-    ? `Teri mehnat ke +${earned}🪙 mil gaye. Party kab hai?`
-    : "Revision done! Agli baar coins bhi milenge.",
-);
+  save();
+  renderAll();
+
+  playDoneSound();
+  if (earned > 0) {
+    setTimeout(playCoinSound, 90);
+    if (originRect) {
+      setTimeout(() => flyCoinsFromRect(originRect, earned), 120);
+    }
+  }
+
+  showToast(
+    `Shabash sher! 🦁💰`,
+    "",
+    earned > 0
+      ? `Teri mehnat ke +${earned}🪙 mil gaye. Party kab hai?`
+      : "Revision done! Agli baar coins bhi milenge.",
+  );
   pushGroupUpdate();
   checkGroupMilestone();
 }
@@ -1040,14 +1088,14 @@ function markGraceDone(id) {
       : document.querySelector(`button[onclick*="${id}"]`);
   const originRect = originEl ? originEl.getBoundingClientRect() : null;
 
-rev.done = true;
-rev.completedOn = todayStr();
-rev.completedInGrace = true;
+  rev.done = true;
+  rev.completedOn = todayStr();
+  rev.completedInGrace = true;
 
-const base = coinForOffset(rev.dayOffset);
-const earned = Math.max(1, base - 2);
-rev.earnedCoins = earned;
-coins = (coins || 0) + earned;
+  const base = coinForOffset(rev.dayOffset);
+  const earned = Math.max(1, base - 2);
+  rev.earnedCoins = earned;
+  coins = (coins || 0) + earned;
 
   save();
   renderAll();
@@ -1076,8 +1124,6 @@ function deleteRevision(id) {
   playDeleteSound();
   pushGroupUpdate();
 }
-
-
 
 let _confirmCallback = null;
 
@@ -1163,21 +1209,32 @@ function renderTodayRevisions() {
   const t = todayStr();
   const yesterday = addDays(t, -1);
 
-  const due = revisions.filter((r) => r.dueDate === t && !r.done && !r.missedPermanently);
+  const due = revisions.filter(
+    (r) => r.dueDate === t && !r.done && !r.missedPermanently,
+  );
   const grace = revisions.filter(
-    (r) => r.dueDate === yesterday && !r.done && !r.missedPermanently && isInGrace(yesterday)
+    (r) =>
+      r.dueDate === yesterday &&
+      !r.done &&
+      !r.missedPermanently &&
+      isInGrace(yesterday),
   );
 
   document.getElementById("stat-due").textContent = due.length + grace.length;
   document.getElementById("stat-done").textContent = revisions.filter(
-    (r) => (r.dueDate === t && r.done) || (r.completedInGrace === true && r.completedOn === t),
+    (r) =>
+      (r.dueDate === t && r.done) ||
+      (r.completedInGrace === true && r.completedOn === t),
   ).length;
   document.getElementById("stat-chapters").textContent = chapters.length;
 
   if (due.length === 0 && grace.length === 0) {
     grid.innerHTML =
       '<div class="empty"><div class="emoji">🎉</div><p>No revisions due today!</p></div>';
-    if (graceTimerInterval) { clearInterval(graceTimerInterval); graceTimerInterval = null; }
+    if (graceTimerInterval) {
+      clearInterval(graceTimerInterval);
+      graceTimerInterval = null;
+    }
     return;
   }
 
@@ -1253,7 +1310,7 @@ function renderTodayRevisions() {
     const revs = groups[subject];
     let rows = "";
     revs.forEach((r) => {
-     rows += `<div class="rev-row">
+      rows += `<div class="rev-row">
         <div style="flex:1;min-width:0"><p>${sanitize(r.chapterName)}</p><span>+${r.dayOffset}d · Will earn: ${coinForOffset(r.dayOffset)}🪙</span></div>
         <div class="rev-actions">
           <button class="btn btn-success btn-sm" onclick="markRevDone('${r.id}')">✓ Done</button>
@@ -1262,7 +1319,7 @@ function renderTodayRevisions() {
     html += `<div class="today-card"><h3>📖 ${sanitize(subject)}</h3>${rows}</div>`;
   });
 
- grid.innerHTML = html;
+  grid.innerHTML = html;
 
   if (grace.length > 0) {
     const el2 = document.getElementById("graceCountdown");
@@ -1295,16 +1352,16 @@ function renderDoneRevisions() {
       const revs = groups[subject];
       let items = "";
       revs.forEach((r) => {
-      const doneLabel = r.completedOn
-        ? r.completedInGrace
-          ? `Completed on grace: ${fmtDate(r.completedOn)}`
-          : `Completed on: ${fmtDate(r.completedOn)}`
-        : fmtDate(r.dueDate);
-      const doneCoins =
-        r.earnedCoins !== undefined
-          ? r.earnedCoins
-          : coinForOffset(r.dayOffset);
-    items += `<div class="done-item">
+        const doneLabel = r.completedOn
+          ? r.completedInGrace
+            ? `Completed on grace: ${fmtDate(r.completedOn)}`
+            : `Completed on: ${fmtDate(r.completedOn)}`
+          : fmtDate(r.dueDate);
+        const doneCoins =
+          r.earnedCoins !== undefined
+            ? r.earnedCoins
+            : coinForOffset(r.dayOffset);
+        items += `<div class="done-item">
   <div class="info"><div class="name">${sanitize(r.chapterName)}</div><div class="meta">+${r.dayOffset}d · ${doneLabel} · +${doneCoins}🪙</div></div>
 </div>`;
       });
@@ -1333,7 +1390,7 @@ function renderDoneRevisions() {
     const revs = mGroups[subject];
     let items = "";
     revs.forEach((r) => {
-     items += `<div class="missed-perm-item">
+      items += `<div class="missed-perm-item">
         <div class="info">
           <div class="name">${sanitize(r.chapterName)}</div>
           <div class="meta">+${r.dayOffset}d · Due ${fmtDate(r.dueDate)} · Missed ${fmtDate(r.missedAt)}</div>
@@ -1349,9 +1406,9 @@ function renderDoneRevisions() {
 function renderCalendar() {
   const container = document.getElementById("calendarList");
   const t = todayStr();
-const upcoming = revisions
-  .filter((r) => !r.done && !r.missedPermanently && r.dueDate >= t)
-  .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const upcoming = revisions
+    .filter((r) => !r.done && !r.missedPermanently && r.dueDate >= t)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   if (upcoming.length === 0) {
     container.innerHTML =
       '<div class="empty"><div class="emoji">📭</div><p>No upcoming revisions.</p></div>';
@@ -1367,7 +1424,7 @@ const upcoming = revisions
     const revs = byDate[date];
     let chips = "";
     revs.forEach((r) => {
-    chips += `<div class="cal-chip"><p class="chip-name">${sanitize(r.chapterName)}</p><p class="chip-meta">${sanitize(r.subject)} · +${r.dayOffset}d · Will earn: ${coinForOffset(r.dayOffset)}🪙</p></div>`;
+      chips += `<div class="cal-chip"><p class="chip-name">${sanitize(r.chapterName)}</p><p class="chip-meta">${sanitize(r.subject)} · +${r.dayOffset}d · Will earn: ${coinForOffset(r.dayOffset)}🪙</p></div>`;
     });
     html += `<div class="cal-day">
       <div class="cal-day-header">
@@ -1464,9 +1521,9 @@ function chapterCard(ch) {
       : ch.status === "In Progress"
         ? "badge-ip"
         : "badge-ns";
- const upcoming = revisions
-   .filter((r) => r.chapterId === ch.id && !r.done && !r.missedPermanently)
-   .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const upcoming = revisions
+    .filter((r) => r.chapterId === ch.id && !r.done && !r.missedPermanently)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const t = todayStr();
   let nextRev = "";
   if (upcoming[0]) {
@@ -1475,7 +1532,9 @@ function chapterCard(ch) {
     nextRev = `<p class="all-done">✅ All revisions done!</p>`;
   }
   const weakBadge = ch.isWeak ? `<span class="weak-badge">⚠ Weak</span>` : "";
-  const customBadge = ch.isCustom ? `<span class="custom-badge">✦ Custom</span>` : "";
+  const customBadge = ch.isCustom
+    ? `<span class="custom-badge">✦ Custom</span>`
+    : "";
 
   let dots = "";
   [1, 3, 7, 30].forEach((n) => {
@@ -1483,13 +1542,13 @@ function chapterCard(ch) {
       (r) => r.chapterId === ch.id && r.dayOffset === n,
     );
     if (!rev) return;
-   const cls = rev.done
-     ? "done"
-     : rev.missedPermanently
-       ? "missed"
-       : rev.dueDate === t
-         ? "today"
-         : "pending";
+    const cls = rev.done
+      ? "done"
+      : rev.missedPermanently
+        ? "missed"
+        : rev.dueDate === t
+          ? "today"
+          : "pending";
     dots += `<div class="rev-dot ${cls}" title="+${n}d">${n}</div>`;
   });
   const dotsHtml = dots ? `<div class="rev-dots">${dots}</div>` : "";
@@ -1541,11 +1600,12 @@ function chapterCard(ch) {
   if (!missedHtml)
     missedHtml = `<div class="see-rev-empty">No missed revisions.</div>`;
 
-const chRevs_lock = revisions.filter((r) => r.chapterId === ch.id);
-const r1 = chRevs_lock.find((r) => r.dayOffset === 1);
-const isLocked = r1 && (r1.done || r1.missedPermanently || r1.completedInGrace);
+  const chRevs_lock = revisions.filter((r) => r.chapterId === ch.id);
+  const r1 = chRevs_lock.find((r) => r.dayOffset === 1);
+  const isLocked =
+    r1 && (r1.done || r1.missedPermanently || r1.completedInGrace);
 
-return `<div class="chapter-card">
+  return `<div class="chapter-card">
     <div class="chapter-card-top">
       <div style="flex:1;min-width:0">
         <span class="chapter-name">${sanitize(ch.name)}</span>${weakBadge}${customBadge}
@@ -1597,17 +1657,17 @@ ${
 // ── MODAL ──
 function showNotifModal() {
   const t = todayStr();
-const due = revisions.filter(
-  (r) => r.dueDate === t && !r.done && !r.missedPermanently,
-);
-if (due.length === 0) return;
-let html = "";
-due.forEach((r) => {
-  html += `<li class="notif-item">
+  const due = revisions.filter(
+    (r) => r.dueDate === t && !r.done && !r.missedPermanently,
+  );
+  if (due.length === 0) return;
+  let html = "";
+  due.forEach((r) => {
+    html += `<li class="notif-item">
       <div><p class="nname">${sanitize(r.chapterName)}</p><p class="nsub">${sanitize(r.subject)} · +${r.dayOffset} day · ${coinForOffset(r.dayOffset)}🪙</p></div>
       <span class="ntag">Due Today</span>
     </li>`;
-});
+  });
   document.getElementById("notifList").innerHTML = html;
   document.getElementById("notifModal").classList.remove("hidden");
 }
@@ -1632,17 +1692,17 @@ async function createGroup() {
     );
     return;
   }
- const name = profile && profile.name ? profile.name.trim() : "";
- if (!name) {
-   showToast(
-     "Pehle profile mein naam set karo! 👤",
-     "error",
-     "Profile drawer kholo aur naam likho.",
-   );
-   return;
- }
-const grpNameVal =
-  document.getElementById("grp-groupname").value.trim() || name + "'s Group";
+  const name = profile && profile.name ? profile.name.trim() : "";
+  if (!name) {
+    showToast(
+      "Pehle profile mein naam set karo! 👤",
+      "error",
+      "Profile drawer kholo aur naam likho.",
+    );
+    return;
+  }
+  const grpNameVal =
+    document.getElementById("grp-groupname").value.trim() || name + "'s Group";
   const code = generateGroupCode();
   groupCode = code;
   groupName = name;
@@ -1686,11 +1746,11 @@ async function joinGroup() {
     );
     return;
   }
- const name = profile && profile.name ? profile.name.trim() : "";
- const code = document
-   .getElementById("grp-code-input")
-   .value.trim()
-   .toUpperCase();
+  const name = profile && profile.name ? profile.name.trim() : "";
+  const code = document
+    .getElementById("grp-code-input")
+    .value.trim()
+    .toUpperCase();
   if (!name) {
     showToast(
       "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
@@ -1717,15 +1777,15 @@ async function joinGroup() {
   }
   showToast("Checking code…", "info");
   try {
-  const snap = await db.collection("groups").doc(code).get();
-  if (!snap.exists) {
-    showToast(
-      "Galat code! Kya jasusi karne ka irada hai? 🕵️‍♂️❌",
-      "error",
-      "Koi group nahi mila. Code check karo.",
-    );
-    return;
-  }
+    const snap = await db.collection("groups").doc(code).get();
+    if (!snap.exists) {
+      showToast(
+        "Galat code! Kya jasusi karne ka irada hai? 🕵️‍♂️❌",
+        "error",
+        "Koi group nahi mila. Code check karo.",
+      );
+      return;
+    }
   } catch (e) {
     showToast(
       "Internet ne saath chhod diya! 📶😭",
@@ -1965,11 +2025,11 @@ function renderGroup() {
   if (!groupCode) {
     document.getElementById("groupSetup").style.display = "block";
     document.getElementById("groupMain").style.display = "none";
-       return;
+    return;
   }
- document.getElementById("groupSetup").style.display = "none";
- document.getElementById("groupMain").style.display = "block";
- document.getElementById("groupCodeDisplay").textContent = groupCode;
+  document.getElementById("groupSetup").style.display = "none";
+  document.getElementById("groupMain").style.display = "block";
+  document.getElementById("groupCodeDisplay").textContent = groupCode;
   const nameEl = document.getElementById("groupNameDisplay");
   if (nameEl) nameEl.textContent = groupDisplayName || "";
   const renameBtn = document.getElementById("renameGroupBtn");
@@ -2085,28 +2145,38 @@ function rebuildSubjectsFromSyllabus() {
   if (!window._syllabus || !profile) return;
   // No guard — always rebuild subject list from profile preferences
 
-  const stream   = profile.stream   || "science";
-  const lang2    = profile.lang2    || "hindi";
+  const stream = profile.stream || "science";
+  const lang2 = profile.lang2 || "hindi";
   const elective = profile.elective || "computer";
 
-  const toLoad = ["english_lang","english_lit","history","civics","geography","maths"];
-  if (stream === "science") toLoad.push("physics","chemistry","biology");
-  else toLoad.push("commerce","economics_g2");
+  const toLoad = [
+    "english_lang",
+    "english_lit",
+    "history",
+    "civics",
+    "geography",
+    "maths",
+  ];
+  if (stream === "science") toLoad.push("physics", "chemistry", "biology");
+  else toLoad.push("commerce", "economics_g2");
   toLoad.push(lang2);
   toLoad.push(elective);
 
   const subjDefs = {};
-  Object.values(window._syllabus.groups).forEach(group => {
+  Object.values(window._syllabus.groups).forEach((group) => {
     Object.entries(group.subjects).forEach(([key, subj]) => {
       subjDefs[key] = subj;
     });
   });
 
-  subjects = [...new Set(
-    toLoad
-      .filter(key => subjDefs[key] && subjDefs[key].chapters.length > 0)
-      .map(key => subjDefs[key].name)
-  )].map(s => (s === "History" || s === "Civics") ? "History & Civics" : s)
+  subjects = [
+    ...new Set(
+      toLoad
+        .filter((key) => subjDefs[key] && subjDefs[key].chapters.length > 0)
+        .map((key) => subjDefs[key].name),
+    ),
+  ]
+    .map((s) => (s === "History" || s === "Civics" ? "History & Civics" : s))
     .filter((s, i, arr) => arr.indexOf(s) === i);
   save();
 }
@@ -2117,10 +2187,12 @@ function updateChapterSuggestions() {
   const inp = document.getElementById("chapterName");
   if (!sel) return;
   const selectedSubject = document.getElementById("subjectSelect").value;
- const aliases = { "History & Civics": ["Civics", "History"] };
+  const aliases = { "History & Civics": ["Civics", "History"] };
   const lookFor = aliases[selectedSubject] || [selectedSubject];
   const addedNames = new Set(
-    chapters.filter(c => c.subject === selectedSubject).map(c => c.name.trim().toLowerCase())
+    chapters
+      .filter((c) => c.subject === selectedSubject)
+      .map((c) => c.name.trim().toLowerCase()),
   );
   const allChapters = [];
   if (window._syllabus) {
@@ -2139,14 +2211,18 @@ function updateChapterSuggestions() {
   if (allChapters.length > 0) {
     sel.style.display = "block";
     if (inp) inp.style.display = "none";
-    sel.innerHTML = `<option value="" disabled selected>— Select a chapter —</option>` +
+    sel.innerHTML =
+      `<option value="" disabled selected>— Select a chapter —</option>` +
       allChapters
-      .map((n) => `<option value="${sanitize(n)}">${sanitize(n)}</option>`)
-      .join("") +
+        .map((n) => `<option value="${sanitize(n)}">${sanitize(n)}</option>`)
+        .join("") +
       `<option value="__custom__">✦ Type custom name...</option>`;
   } else {
     sel.style.display = "none";
-    if (inp) { inp.style.display = "block"; inp.value = ""; }
+    if (inp) {
+      inp.style.display = "block";
+      inp.value = "";
+    }
   }
 }
 
@@ -2205,8 +2281,20 @@ function _renderDeadlineBanner() {
 
   if (profile.deadline) {
     // Show countdown banner
-    const dLeft = Math.max(0, Math.round((dateKeyToUTC(profile.deadline) - dateKeyToUTC(today)) / 86400000));
-    const examLeft = profile.examDate ? Math.max(0, Math.round((dateKeyToUTC(profile.examDate) - dateKeyToUTC(today)) / 86400000)) : null;
+    const dLeft = Math.max(
+      0,
+      Math.round(
+        (dateKeyToUTC(profile.deadline) - dateKeyToUTC(today)) / 86400000,
+      ),
+    );
+    const examLeft = profile.examDate
+      ? Math.max(
+          0,
+          Math.round(
+            (dateKeyToUTC(profile.examDate) - dateKeyToUTC(today)) / 86400000,
+          ),
+        )
+      : null;
     const color = dLeft <= 7 ? _PC.red : dLeft <= 20 ? _PC.yellow : _PC.green;
     banner.innerHTML = `<div class="prog-section" style="background:${_PC.bg};border:1px solid ${_PC.border};border-top:3px solid ${color};border-radius:16px;padding:16px 18px;margin-bottom:14px;box-shadow:0 4px 24px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div>
@@ -2227,7 +2315,9 @@ function _renderDeadlineBanner() {
     return;
   }
 
-  const { minDate, maxDate, minLabel, maxLabel } = _deadlineBounds(profile.examDate);
+  const { minDate, maxDate, minLabel, maxLabel } = _deadlineBounds(
+    profile.examDate,
+  );
   banner.innerHTML = `<div class="prog-section" style="background:${_PC.bg};border:2px solid ${_PC.indigo}55;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 24px rgba(0,0,0,0.5)">
     <div style="font-size:0.65rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:${_PC.indigo};font-family:${_PC.font};margin-bottom:6px">🎯 Set Your Study Deadline</div>
     <div style="font-size:0.78rem;color:${_PC.text2};font-family:${_PC.font};margin-bottom:4px;line-height:1.5">When do you want to finish your full syllabus? All pace calculations use this date.</div>
@@ -2243,7 +2333,8 @@ function _renderDeadlineBanner() {
 function _saveDeadlineFromProgress() {
   const inp = document.getElementById("prog-deadline-input");
   if (!inp || !inp.value) {
-    document.getElementById("prog-deadline-err").textContent = "Please pick a date.";
+    document.getElementById("prog-deadline-err").textContent =
+      "Please pick a date.";
     return;
   }
   const err = _validateDeadline(inp.value, profile.examDate);
@@ -2267,11 +2358,11 @@ function _clearDeadline() {
 // ── SHARED UTIL ──
 function _syllabusTotal(subjectName) {
   if (!window._syllabus) return null;
-const aliases = { "History & Civics": ["Civics", "History"] };
+  const aliases = { "History & Civics": ["Civics", "History"] };
   const lookFor = aliases[subjectName] || [subjectName];
   let count = 0;
-  Object.values(window._syllabus.groups).forEach(group => {
-    Object.values(group.subjects).forEach(subj => {
+  Object.values(window._syllabus.groups).forEach((group) => {
+    Object.values(group.subjects).forEach((subj) => {
       if (lookFor.includes(subj.name) && subj.chapters.length > 0)
         count += subj.chapters.length;
     });
@@ -2281,16 +2372,23 @@ const aliases = { "History & Civics": ["Civics", "History"] };
 
 function _syllabusGrandTotal() {
   if (!window._syllabus || !profile) return null;
-  const stream   = profile.stream   || "science";
-  const lang2    = profile.lang2    || "hindi";
+  const stream = profile.stream || "science";
+  const lang2 = profile.lang2 || "hindi";
   const elective = profile.elective || "computer";
-  const toLoad = ["english_lang","english_lit","history","civics","geography","maths"];
-  if (stream === "science") toLoad.push("physics","chemistry","biology");
-  else toLoad.push("commerce","economics_g2");
+  const toLoad = [
+    "english_lang",
+    "english_lit",
+    "history",
+    "civics",
+    "geography",
+    "maths",
+  ];
+  if (stream === "science") toLoad.push("physics", "chemistry", "biology");
+  else toLoad.push("commerce", "economics_g2");
   toLoad.push(lang2);
   toLoad.push(elective);
   let total = 0;
-  Object.values(window._syllabus.groups).forEach(group => {
+  Object.values(window._syllabus.groups).forEach((group) => {
     Object.entries(group.subjects).forEach(([key, subj]) => {
       if (toLoad.includes(key)) total += subj.chapters.length;
     });
@@ -2300,20 +2398,20 @@ function _syllabusGrandTotal() {
 
 // ── PROGRESS THEME PALETTE ──
 const _PC = {
-  bg:     "linear-gradient(160deg,#0f0c16 0%,#0d0a12 100%)",
-  bg4:    "#1c1826",
-  bg5:    "#252133",
+  bg: "linear-gradient(160deg,#0f0c16 0%,#0d0a12 100%)",
+  bg4: "#1c1826",
+  bg5: "#252133",
   border: "#2e2840",
-  text:   "#f5ede0",
-  text2:  "#a89880",
-  text3:  "#5c5048",
+  text: "#f5ede0",
+  text2: "#a89880",
+  text3: "#5c5048",
   indigo: "#c2762a",
   yellow: "#e8a020",
-  green:  "#2d9e6b",
-  red:    "#e05c5c",
+  green: "#2d9e6b",
+  red: "#e05c5c",
   purple: "#b07fd4",
   orange: "#f97316",
-  font:   "'Baloo 2',sans-serif",
+  font: "'Baloo 2',sans-serif",
 };
 
 // ── CSS KEYFRAMES injected once ──
@@ -2406,10 +2504,11 @@ function _bar(pct, color, height = 7) {
 }
 
 function _ringChart(pct, color, size = 110, stroke = 13) {
-  const r = (size / 2) - stroke;
+  const r = size / 2 - stroke;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
-  const cx = size / 2, cy = size / 2;
+  const cx = size / 2,
+    cy = size / 2;
   return `<svg class="prog-ring-pulse" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg)" overflow="visible">
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${_PC.bg4}" stroke-width="${stroke}"/>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
@@ -2438,72 +2537,120 @@ function renderReadiness() {
   if (!block) return;
   _injectProgressCSS();
 
-  const syllabusChapters = chapters.filter(c => !c.isCustom);
+  const syllabusChapters = chapters.filter((c) => !c.isCustom);
   const syllabusTotal = _syllabusGrandTotal() || syllabusChapters.length;
   if (syllabusTotal === 0) {
-    block.innerHTML = _progSection(_progHeader("🎯","Exam Readiness",_PC.indigo) + _emptyState("Syllabus data unavailable."));
+    block.innerHTML = _progSection(
+      _progHeader("🎯", "Exam Readiness", _PC.indigo) +
+        _emptyState("Syllabus data unavailable."),
+    );
     return;
   }
 
-  const completed = syllabusChapters.filter(c => c.status === "Completed").length;
+  const completed = syllabusChapters.filter(
+    (c) => c.status === "Completed",
+  ).length;
   const completionScore = (completed / syllabusTotal) * 60;
 
-  const chaptersWith4 = syllabusChapters.filter(c =>
-    [1,3,7,30].every(n => revisions.find(r => r.chapterId === c.id && r.dayOffset === n && r.done))
+  const chaptersWith4 = syllabusChapters.filter((c) =>
+    [1, 3, 7, 30].every((n) =>
+      revisions.find(
+        (r) => r.chapterId === c.id && r.dayOffset === n && r.done,
+      ),
+    ),
   ).length;
   const consistencyScore = completed > 0 ? (chaptersWith4 / completed) * 25 : 0;
 
   // Balance across ALL syllabus subjects, not just user-added ones
   const syllabusSubjectTotals = {};
   if (window._syllabus) {
-    const stream = profile ? (profile.stream || "science") : "science";
-    const lang2 = profile ? (profile.lang2 || "hindi") : "hindi";
-    const elective = profile ? (profile.elective || "computer") : "computer";
-    const toLoad = ["english_lang","english_lit","history","civics","geography","maths"];
-    if (stream === "science") toLoad.push("physics","chemistry","biology");
-    else toLoad.push("commerce","economics_g2");
+    const stream = profile ? profile.stream || "science" : "science";
+    const lang2 = profile ? profile.lang2 || "hindi" : "hindi";
+    const elective = profile ? profile.elective || "computer" : "computer";
+    const toLoad = [
+      "english_lang",
+      "english_lit",
+      "history",
+      "civics",
+      "geography",
+      "maths",
+    ];
+    if (stream === "science") toLoad.push("physics", "chemistry", "biology");
+    else toLoad.push("commerce", "economics_g2");
     toLoad.push(lang2, elective);
-    const MERGE = { "History": "History & Civics", "Civics": "History & Civics" };
-    Object.values(window._syllabus.groups).forEach(group => {
+    const MERGE = { History: "History & Civics", Civics: "History & Civics" };
+    Object.values(window._syllabus.groups).forEach((group) => {
       Object.entries(group.subjects).forEach(([key, subj]) => {
         if (toLoad.includes(key) && subj.chapters.length > 0) {
           const displayName = MERGE[subj.name] || subj.name;
-          syllabusSubjectTotals[displayName] = (syllabusSubjectTotals[displayName] || 0) + subj.chapters.length;
+          syllabusSubjectTotals[displayName] =
+            (syllabusSubjectTotals[displayName] || 0) + subj.chapters.length;
         }
       });
     });
   }
   const subjectDone = {};
-  syllabusChapters.filter(c => c.status === "Completed").forEach(c => {
-    subjectDone[c.subject] = (subjectDone[c.subject] || 0) + 1;
-  });
+  syllabusChapters
+    .filter((c) => c.status === "Completed")
+    .forEach((c) => {
+      subjectDone[c.subject] = (subjectDone[c.subject] || 0) + 1;
+    });
   const allSubjects = Object.keys(syllabusSubjectTotals);
   let imbalance = 0;
-  allSubjects.forEach(s => {
+  allSubjects.forEach((s) => {
     const p = (subjectDone[s] || 0) / syllabusSubjectTotals[s];
     imbalance += Math.pow(1 - p, 2);
   });
-  const balanceScore = allSubjects.length === 0
-    ? 0
-    : (1 - Math.min(1, imbalance / allSubjects.length)) * 15;
-  const readiness = Math.round(completionScore + consistencyScore + balanceScore);
+  const balanceScore =
+    allSubjects.length === 0
+      ? 0
+      : (1 - Math.min(1, imbalance / allSubjects.length)) * 15;
+  const readiness = Math.round(
+    completionScore + consistencyScore + balanceScore,
+  );
 
-  const ringColor = readiness >= 70 ? _PC.green : readiness >= 40 ? _PC.yellow : _PC.red;
-  const grade = readiness >= 85 ? "ELITE" : readiness >= 70 ? "STRONG" : readiness >= 50 ? "BUILDING" : readiness >= 30 ? "EARLY" : "START";
-  const gradeColor = readiness >= 70 ? _PC.green : readiness >= 50 ? _PC.yellow : readiness >= 30 ? _PC.orange : _PC.red;
-  const donePct = syllabusTotal > 0 ? Math.round((completed / syllabusTotal) * 100) : 0;
-  const revPct = completed > 0 ? Math.round((chaptersWith4 / completed) * 100) : 0;
+  const ringColor =
+    readiness >= 70 ? _PC.green : readiness >= 40 ? _PC.yellow : _PC.red;
+  const grade =
+    readiness >= 85
+      ? "ELITE"
+      : readiness >= 70
+        ? "STRONG"
+        : readiness >= 50
+          ? "BUILDING"
+          : readiness >= 30
+            ? "EARLY"
+            : "START";
+  const gradeColor =
+    readiness >= 70
+      ? _PC.green
+      : readiness >= 50
+        ? _PC.yellow
+        : readiness >= 30
+          ? _PC.orange
+          : _PC.red;
+  const donePct =
+    syllabusTotal > 0 ? Math.round((completed / syllabusTotal) * 100) : 0;
+  const revPct =
+    completed > 0 ? Math.round((chaptersWith4 / completed) * 100) : 0;
 
   // Exam countdown badge
   let countdownHtml = "";
   if (profile && profile.examDate) {
-    const dLeft = Math.max(0, Math.round((dateKeyToUTC(profile.examDate) - dateKeyToUTC(todayStr())) / 86400000));
-    const urgency = dLeft <= 30 ? _PC.red : dLeft <= 60 ? _PC.yellow : _PC.green;
+    const dLeft = Math.max(
+      0,
+      Math.round(
+        (dateKeyToUTC(profile.examDate) - dateKeyToUTC(todayStr())) / 86400000,
+      ),
+    );
+    const urgency =
+      dLeft <= 30 ? _PC.red : dLeft <= 60 ? _PC.yellow : _PC.green;
     countdownHtml = `<div style="background:${urgency}18;border:1px solid ${urgency}44;border-radius:8px;padding:5px 11px;font-size:0.68rem;font-weight:800;color:${urgency};font-family:${_PC.font};white-space:nowrap">⏳ ${dLeft}d left</div>`;
   }
 
-  block.innerHTML = _progSection(`
-    ${_progHeader("🎯","Exam Readiness",_PC.indigo, countdownHtml)}
+  block.innerHTML = _progSection(
+    `
+    ${_progHeader("🎯", "Exam Readiness", _PC.indigo, countdownHtml)}
     <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
       <div style="position:relative;width:112px;height:112px;flex-shrink:0">
         ${_ringChart(donePct, ringColor, 112, 13)}
@@ -2528,43 +2675,66 @@ function renderReadiness() {
     <div style="margin-top:12px;background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:8px;padding:9px 12px;font-size:0.65rem;color:${_PC.text3};font-family:${_PC.font};line-height:1.6">
       Score = chapters done (max 60) + all-4-revisions rate (max 25) + subject balance (max 15)
     </div>
-  `, `border-top:3px solid ${_PC.indigo};animation:progGlow 3s ease-in-out infinite;`);
+  `,
+    `border-top:3px solid ${_PC.indigo};animation:progGlow 3s ease-in-out infinite;`,
+  );
 }
 
 // ── 2. PACE TRACKER ──
 function renderPace() {
   const block = document.getElementById("prog-pace-block");
   if (!block) return;
-  if (!profile || !profile.examDate) { block.innerHTML = ""; return; }
+  if (!profile || !profile.examDate) {
+    block.innerHTML = "";
+    return;
+  }
 
-  const syllabusChapters = chapters.filter(c => !c.isCustom);
+  const syllabusChapters = chapters.filter((c) => !c.isCustom);
   const syllabusTotal = _syllabusGrandTotal() || syllabusChapters.length;
-  if (syllabusTotal === 0) { block.innerHTML = ""; return; }
+  if (syllabusTotal === 0) {
+    block.innerHTML = "";
+    return;
+  }
 
   const today = todayStr();
-  const completed = syllabusChapters.filter(c => c.status === "Completed").length;
+  const completed = syllabusChapters.filter(
+    (c) => c.status === "Completed",
+  ).length;
   const _dl = profile.deadline || profile.examDate;
-  const daysLeft = Math.max(1, Math.round((dateKeyToUTC(_dl) - dateKeyToUTC(today)) / 86400000));
+  const daysLeft = Math.max(
+    1,
+    Math.round((dateKeyToUTC(_dl) - dateKeyToUTC(today)) / 86400000),
+  );
   const remaining = syllabusTotal - completed;
   const paceNeeded = (remaining / daysLeft).toFixed(1);
   // Use dates when revisions were actually marked done (R1 = day after completion)
   // as proxy for "days the user actively studied"
   const activeDays = new Set(
     revisions
-      .filter(r => r.done && r.completedOn && r.dayOffset === 1)
-      .map(r => r.completedOn)
+      .filter((r) => r.done && r.completedOn && r.dayOffset === 1)
+      .map((r) => r.completedOn),
   );
-  const studyDays = activeDays.size > 0 ? activeDays.size : null;
+  const addedDays = new Set(
+    chapters.filter((c) => !c.isCustom && c.status === "Completed" && c.dateAdded).map((c) => c.dateAdded)
+  );
+  const studyDays = activeDays.size > 0 ? activeDays.size : addedDays.size > 0 ? addedDays.size : null;
   const dailyPace = studyDays ? (completed / studyDays).toFixed(1) : "0.0";
   const onTrack = parseFloat(dailyPace) >= parseFloat(paceNeeded);
-  const projDays = parseFloat(dailyPace) > 0 ? Math.ceil(remaining / parseFloat(dailyPace)) : null;
+  const projDays =
+    parseFloat(dailyPace) > 0
+      ? Math.ceil(remaining / parseFloat(dailyPace))
+      : null;
   const projDate = projDays ? fmtDate(addDays(today, projDays)) : "—";
   const statusColor = onTrack ? _PC.green : _PC.red;
   const statusLabel = onTrack ? "On Track 🟢" : "Behind Pace 🔴";
 
-  block.innerHTML = _progSection(`
-    ${_progHeader("📈","Pace Tracker", _PC.yellow,
-      `<span style="font-size:0.65rem;font-weight:800;color:${statusColor};background:${statusColor}18;border:1px solid ${statusColor}33;padding:3px 9px;border-radius:99px;font-family:${_PC.font}">${statusLabel}</span>`
+  block.innerHTML = _progSection(
+    `
+    ${_progHeader(
+      "📈",
+      "Pace Tracker",
+      _PC.yellow,
+      `<span style="font-size:0.65rem;font-weight:800;color:${statusColor};background:${statusColor}18;border:1px solid ${statusColor}33;padding:3px 9px;border-radius:99px;font-family:${_PC.font}">${statusLabel}</span>`,
     )}
     <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:0.65rem;color:${_PC.text2};line-height:1.6;font-family:${_PC.font}">
       <b style="color:${_PC.text}">Need/Day</b> = chapters still left ÷ days until your deadline. &nbsp;
@@ -2580,104 +2750,128 @@ function renderPace() {
       <div style="font-size:0.72rem;color:${_PC.text2};font-family:${_PC.font}">Projected finish</div>
       <div style="font-size:0.82rem;font-weight:800;color:${onTrack ? _PC.green : _PC.red};font-family:${_PC.font}">${projDate}</div>
     </div>
-  `, `border-top:3px solid ${_PC.yellow};`);
+  `,
+    `border-top:3px solid ${_PC.yellow};`,
+  );
 }
 
 // ── 3. SYLLABUS MAP ──
 function renderSyllabusMap() {
   const block = document.getElementById("prog-syllabus-block");
   if (!block) return;
-  if (!window._syllabus || !profile) { block.innerHTML = ""; return; }
+  if (!window._syllabus || !profile) {
+    block.innerHTML = "";
+    return;
+  }
 
-  const stream   = profile.stream   || "science";
-  const lang2    = profile.lang2    || "hindi";
+  const stream = profile.stream || "science";
+  const lang2 = profile.lang2 || "hindi";
   const elective = profile.elective || "computer";
-  const toLoad = ["english_lang","english_lit","history","civics","geography","maths"];
-  if (stream === "science") toLoad.push("physics","chemistry","biology");
-  else toLoad.push("commerce","economics_g2");
+  const toLoad = [
+    "english_lang",
+    "english_lit",
+    "history",
+    "civics",
+    "geography",
+    "maths",
+  ];
+  if (stream === "science") toLoad.push("physics", "chemistry", "biology");
+  else toLoad.push("commerce", "economics_g2");
   toLoad.push(lang2);
   toLoad.push(elective);
 
-  const MERGE = { "History": "History & Civics", "Civics": "History & Civics" };
+  const MERGE = { History: "History & Civics", Civics: "History & Civics" };
   const subjDefs = {};
-  Object.values(window._syllabus.groups).forEach(group => {
-    Object.entries(group.subjects).forEach(([key, subj]) => { subjDefs[key] = subj; });
+  Object.values(window._syllabus.groups).forEach((group) => {
+    Object.entries(group.subjects).forEach(([key, subj]) => {
+      subjDefs[key] = subj;
+    });
   });
 
   // Build per-subject chapter status map from actual chapters array
   const chapterStatusMap = {};
-  chapters.forEach(c => {
+  chapters.forEach((c) => {
     const key = c.subject + "|" + c.name.trim().toLowerCase();
     chapterStatusMap[key] = c.status;
   });
   const revisionMap = {};
-  chapters.forEach(c => {
-    const revsDone = [1,3,7,30].filter(n => revisions.find(r => r.chapterId === c.id && r.dayOffset === n && r.done)).length;
+  chapters.forEach((c) => {
+    const revsDone = [1, 3, 7, 30].filter((n) =>
+      revisions.find(
+        (r) => r.chapterId === c.id && r.dayOffset === n && r.done,
+      ),
+    ).length;
     revisionMap[c.subject + "|" + c.name.trim().toLowerCase()] = revsDone;
   });
 
   // Group by merged subject name, deduplicate
   const seen = new Set();
   const subjectSections = [];
-  toLoad.forEach(key => {
+  toLoad.forEach((key) => {
     const subj = subjDefs[key];
     if (!subj || subj.chapters.length === 0) return;
     const displayName = MERGE[subj.name] || subj.name;
-    if (seen.has(displayName)) return;
+    if (seen.has(displayName)) {
+      const existing = subjectSections.find((s) => s.name === displayName);
+      if (existing) existing.chapters = [...existing.chapters, ...subj.chapters];
+      return;
+    }
     seen.add(displayName);
     subjectSections.push({ name: displayName, chapters: subj.chapters });
   });
 
-  const subjectBlocks = subjectSections.map(({ name, chapters: chaps }) => {
-    const dots = chaps.map((ch, idx) => {
-      const mapKey = name + "|" + ch.name.trim().toLowerCase();
-      const status = chapterStatusMap[mapKey] || "Not Started";
-      const revsDone = revisionMap[mapKey] || 0;
+  const subjectBlocks = subjectSections
+    .map(({ name, chapters: chaps }) => {
+      const dots = chaps
+        .map((ch, idx) => {
+          const mapKey = name + "|" + ch.name.trim().toLowerCase();
+          const status = chapterStatusMap[mapKey] || "Not Started";
+          const revsDone = revisionMap[mapKey] || 0;
 
-      let dotColor, dotBg, dotBorder, dotGlow, dotTitle;
-      if (status === "Not Started") {
-        dotColor = _PC.text3;
-        dotBg = _PC.bg5;
-        dotBorder = _PC.border;
-        dotGlow = "none";
-        dotTitle = "Not Started";
-      } else if (status === "In Progress") {
-        dotColor = _PC.yellow;
-        dotBg = "#2a1f08";
-        dotBorder = _PC.yellow + "66";
-        dotGlow = `0 0 8px ${_PC.yellow}66`;
-        dotTitle = "In Progress";
-      } else {
-        // Completed — brightness based on revisions done
-        if (revsDone === 4) {
-          dotColor = _PC.green;
-          dotBg = "#0a2a1e";
-          dotBorder = _PC.green + "88";
-          dotGlow = `0 0 10px ${_PC.green}88`;
-          dotTitle = "Fully Revised ✓";
-        } else if (revsDone >= 2) {
-          dotColor = _PC.indigo;
-          dotBg = "#2a1a08";
-          dotBorder = _PC.indigo + "88";
-          dotGlow = `0 0 8px ${_PC.indigo}66`;
-          dotTitle = `${revsDone}/4 revisions done`;
-        } else if (revsDone === 1) {
-          dotColor = "#d4a060";
-          dotBg = "#221608";
-          dotBorder = "#d4a06088";
-          dotGlow = `0 0 6px #d4a06066`;
-          dotTitle = "1/4 revisions done";
-        } else {
-          dotColor = "#7c6040";
-          dotBg = "#1a1208";
-          dotBorder = "#7c604066";
-          dotGlow = "none";
-          dotTitle = "Completed, no revisions yet";
-        }
-      }
+          let dotColor, dotBg, dotBorder, dotGlow, dotTitle;
+          if (status === "Not Started") {
+            dotColor = _PC.text3;
+            dotBg = _PC.bg5;
+            dotBorder = _PC.border;
+            dotGlow = "none";
+            dotTitle = "Not Started";
+          } else if (status === "In Progress") {
+            dotColor = _PC.yellow;
+            dotBg = "#2a1f08";
+            dotBorder = _PC.yellow + "66";
+            dotGlow = `0 0 8px ${_PC.yellow}66`;
+            dotTitle = "In Progress";
+          } else {
+            // Completed — brightness based on revisions done
+            if (revsDone === 4) {
+              dotColor = _PC.green;
+              dotBg = "#0a2a1e";
+              dotBorder = _PC.green + "88";
+              dotGlow = `0 0 10px ${_PC.green}88`;
+              dotTitle = "Fully Revised ✓";
+            } else if (revsDone >= 2) {
+              dotColor = _PC.indigo;
+              dotBg = "#2a1a08";
+              dotBorder = _PC.indigo + "88";
+              dotGlow = `0 0 8px ${_PC.indigo}66`;
+              dotTitle = `${revsDone}/4 revisions done`;
+            } else if (revsDone === 1) {
+              dotColor = "#d4a060";
+              dotBg = "#221608";
+              dotBorder = "#d4a06088";
+              dotGlow = `0 0 6px #d4a06066`;
+              dotTitle = "1/4 revisions done";
+            } else {
+              dotColor = "#7c6040";
+              dotBg = "#1a1208";
+              dotBorder = "#7c604066";
+              dotGlow = "none";
+              dotTitle = "Completed, no revisions yet";
+            }
+          }
 
-      const animDelay = (idx * 0.03).toFixed(2);
-      return `<div class="prog-dot-pop" title="${sanitize(ch.name)} — ${dotTitle}" style="
+          const animDelay = (idx * 0.03).toFixed(2);
+          return `<div class="prog-dot-pop" title="${sanitize(ch.name)} — ${dotTitle}" style="
         width:10px;height:10px;border-radius:50%;
         background:${dotBg};
         border:1.5px solid ${dotBorder};
@@ -2686,13 +2880,26 @@ function renderSyllabusMap() {
         transition:transform 0.15s,box-shadow 0.15s;
         animation-delay:${animDelay}s;
       " onmouseenter="this.style.transform='scale(1.6)';this.style.zIndex='10'" onmouseleave="this.style.transform='';this.style.zIndex=''"></div>`;
-    }).join("");
+        })
+        .join("");
 
-    const done = chaps.filter(ch => (chapterStatusMap[name + "|" + ch.name.trim().toLowerCase()] || "Not Started") === "Completed").length;
-    const pct = chaps.length > 0 ? Math.round((done / chaps.length) * 100) : 0;
-    const subColor = pct >= 80 ? _PC.green : pct >= 40 ? _PC.yellow : pct > 0 ? _PC.orange : _PC.text3;
+      const done = chaps.filter(
+        (ch) =>
+          (chapterStatusMap[name + "|" + ch.name.trim().toLowerCase()] ||
+            "Not Started") === "Completed",
+      ).length;
+      const pct =
+        chaps.length > 0 ? Math.round((done / chaps.length) * 100) : 0;
+      const subColor =
+        pct >= 80
+          ? _PC.green
+          : pct >= 40
+            ? _PC.yellow
+            : pct > 0
+              ? _PC.orange
+              : _PC.text3;
 
-    return `
+      return `
       <div style="margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <span style="font-size:0.72rem;font-weight:700;color:${_PC.text};font-family:${_PC.font}">${sanitize(name)}</span>
@@ -2701,25 +2908,30 @@ function renderSyllabusMap() {
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${dots}</div>
         ${_bar(pct, subColor, 4)}
       </div>`;
-  }).join("");
+    })
+    .join("");
 
   // Legend
   const legend = `
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid ${_PC.border}">
       ${[
-        { color: _PC.bg5, border: _PC.border,    label: "Not Started" },
-        { color: "#2a1f08", border: _PC.yellow+"66", label: "In Progress" },
-        { color: "#1a1208", border: "#7c604066",  label: "Done" },
-        { color: "#0a2a1e", border: _PC.green+"88", label: "Fully Revised" },
-      ].map(l => `<div style="display:flex;align-items:center;gap:5px">
+        { color: _PC.bg5, border: _PC.border, label: "Not Started" },
+        { color: "#2a1f08", border: _PC.yellow + "66", label: "In Progress" },
+        { color: "#1a1208", border: "#7c604066", label: "Done" },
+        { color: "#0a2a1e", border: _PC.green + "88", label: "Fully Revised" },
+      ]
+        .map(
+          (l) => `<div style="display:flex;align-items:center;gap:5px">
         <div style="width:9px;height:9px;border-radius:50%;background:${l.color};border:1.5px solid ${l.border}"></div>
         <span style="font-size:0.6rem;color:${_PC.text3};font-family:${_PC.font}">${l.label}</span>
-      </div>`).join("")}
+      </div>`,
+        )
+        .join("")}
     </div>`;
 
   block.innerHTML = _progSection(
     _progHeader("🗺️", "Syllabus Map", _PC.purple) + legend + subjectBlocks,
-    `border-top:3px solid ${_PC.purple};`
+    `border-top:3px solid ${_PC.purple};`,
   );
 }
 
@@ -2727,78 +2939,159 @@ function renderSyllabusMap() {
 function renderSubjectHealth() {
   const block = document.getElementById("prog-subjects-block");
   if (!block) return;
-  if (!window._syllabus || !profile) { block.innerHTML = ""; return; }
+  if (!window._syllabus || !profile) {
+    block.innerHTML = "";
+    return;
+  }
   const today = todayStr();
 
   // Build subjectMap from user-added chapters (for stats)
   const subjectMap = {};
-  chapters.filter(c => !c.isCustom).forEach(c => {
-    if (!subjectMap[c.subject]) subjectMap[c.subject] = [];
-    subjectMap[c.subject].push(c);
-  });
+  chapters
+    .filter((c) => !c.isCustom)
+    .forEach((c) => {
+      if (!subjectMap[c.subject]) subjectMap[c.subject] = [];
+      subjectMap[c.subject].push(c);
+    });
 
   // Build full subject list from syllabus — so all subjects show from day one
   const stream = profile.stream || "science";
   const lang2 = profile.lang2 || "hindi";
   const elective = profile.elective || "computer";
-  const toLoad = ["english_lang","english_lit","history","civics","geography","maths"];
-  if (stream === "science") toLoad.push("physics","chemistry","biology");
-  else toLoad.push("commerce","economics_g2");
+  const toLoad = [
+    "english_lang",
+    "english_lit",
+    "history",
+    "civics",
+    "geography",
+    "maths",
+  ];
+  if (stream === "science") toLoad.push("physics", "chemistry", "biology");
+  else toLoad.push("commerce", "economics_g2");
   toLoad.push(lang2, elective);
-  const MERGE = { "History": "History & Civics", "Civics": "History & Civics" };
+  const MERGE = { History: "History & Civics", Civics: "History & Civics" };
   const seen = new Set();
   const allSubjects = [];
-  Object.values(window._syllabus.groups).forEach(group => {
+  Object.values(window._syllabus.groups).forEach((group) => {
     Object.entries(group.subjects).forEach(([key, subj]) => {
       if (!toLoad.includes(key) || subj.chapters.length === 0) return;
       const displayName = MERGE[subj.name] || subj.name;
-      if (!seen.has(displayName)) { seen.add(displayName); allSubjects.push(displayName); }
+      if (!seen.has(displayName)) {
+        seen.add(displayName);
+        allSubjects.push(displayName);
+      }
     });
   });
 
-  const subjList = allSubjects.map(subj => {
-    const chs = subjectMap[subj] || [];
-    const total = chs.length;
-    const done = chs.filter(c => c.status === "Completed").length;
-    let brightness = 0;
-    chs.forEach(c => {
-      if (c.status !== "Completed") return;
-      const revsDone = [1,3,7,30].filter(n => revisions.find(r => r.chapterId === c.id && r.dayOffset === n && r.done)).length;
-      brightness += 60 + (revsDone / 4) * 40;
-    });
-    const avg = done > 0 ? brightness / done : 0;
-    const syllabusTotal = _syllabusTotal(subj);
-    const realPct = syllabusTotal ? Math.round((done / syllabusTotal) * 100) : Math.round((done / total) * 100);
-    // Status based on % of syllabus completed
-    // 0% with chapters added = DANGER (started but nothing done)
-    // 0% with NO chapters added = NOT STARTED (genuinely untouched)
-    const notStarted = total === 0;
-    const color = realPct >= 75 ? _PC.green : realPct >= 40 ? _PC.yellow : realPct > 0 ? _PC.orange : notStarted ? _PC.text3 : _PC.red;
-    const status = realPct >= 75 ? "STRONG" : realPct >= 40 ? "OK" : realPct > 0 ? "WEAK" : notStarted ? "NOT STARTED" : "DANGER";
-    const dueSoon = revisions.filter(r =>
-      chs.find(c => c.id === r.chapterId) && !r.done && !r.missedPermanently && r.dueDate <= addDays(today, 3)
-    ).length;
-    const revActivityDates = revisions
-      .filter(r => r.done && r.completedOn && chs.find(c => c.id === r.chapterId))
-      .map(r => r.completedOn).sort().reverse();
-    const fallbackDates = chs.map(c => c.dateAdded).filter(Boolean).sort().reverse();
-    const lastDate = revActivityDates[0] || fallbackDates[0];
-    const daysSince = lastDate ? Math.round((dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000) : null;
-    return { subj, total, done, pct: realPct, syllabusTotal, color, status, dueSoon, daysSince };
-  }).sort((a, b) => a.pct - b.pct);
+  const subjList = allSubjects
+    .map((subj) => {
+      const chs = subjectMap[subj] || [];
+      const total = chs.length;
+      const done = chs.filter((c) => c.status === "Completed").length;
+      let brightness = 0;
+      chs.forEach((c) => {
+        if (c.status !== "Completed") return;
+        const revsDone = [1, 3, 7, 30].filter((n) =>
+          revisions.find(
+            (r) => r.chapterId === c.id && r.dayOffset === n && r.done,
+          ),
+        ).length;
+        brightness += 60 + (revsDone / 4) * 40;
+      });
+      const avg = done > 0 ? brightness / done : 0;
+      const syllabusTotal = _syllabusTotal(subj);
+      const realPct = syllabusTotal
+        ? Math.round((done / syllabusTotal) * 100)
+        : Math.round((done / total) * 100);
+      // Status based on % of syllabus completed
+      // 0% with chapters added = DANGER (started but nothing done)
+      // 0% with NO chapters added = NOT STARTED (genuinely untouched)
+      const notStarted = total === 0;
+      const color =
+        realPct >= 75
+          ? _PC.green
+          : realPct >= 40
+            ? _PC.yellow
+            : realPct > 0
+              ? _PC.orange
+              : notStarted
+                ? _PC.text3
+                : _PC.red;
+      const status =
+        realPct >= 75
+          ? "STRONG"
+          : realPct >= 40
+            ? "OK"
+            : realPct > 0
+              ? "WEAK"
+              : notStarted
+                ? "NOT STARTED"
+                : "DANGER";
+      const dueSoon = revisions.filter(
+        (r) =>
+          chs.find((c) => c.id === r.chapterId) &&
+          !r.done &&
+          !r.missedPermanently &&
+          r.dueDate <= addDays(today, 3),
+      ).length;
+      const revActivityDates = revisions
+        .filter(
+          (r) =>
+            r.done && r.completedOn && chs.find((c) => c.id === r.chapterId),
+        )
+        .map((r) => r.completedOn)
+        .sort()
+        .reverse();
+      const fallbackDates = chs
+        .map((c) => c.dateAdded)
+        .filter(Boolean)
+        .sort()
+        .reverse();
+      const lastDate = revActivityDates[0] || fallbackDates[0];
+      const daysSince = lastDate
+        ? Math.round((dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000)
+        : null;
+      return {
+        subj,
+        total,
+        done,
+        pct: realPct,
+        syllabusTotal,
+        color,
+        status,
+        dueSoon,
+        daysSince,
+      };
+    })
+    .sort((a, b) => a.pct - b.pct);
 
-  const danger = subjList.filter(s => s.status === "DANGER").length;
-  const strong = subjList.filter(s => s.status === "STRONG").length;
+  const danger = subjList.filter((s) => s.status === "DANGER").length;
+  const strong = subjList.filter((s) => s.status === "STRONG").length;
 
-  const cards = subjList.map(s => {
-    // Revision quality: % of completed chapters with all 4 revisions done
-    const completedChs = (subjectMap[s.subj] || []).filter(c => c.status === "Completed");
-    const fullyRevised = completedChs.filter(c =>
-      [1,3,7,30].every(n => revisions.find(r => r.chapterId === c.id && r.dayOffset === n && r.done))
-    ).length;
-    const revQualityPct = completedChs.length > 0 ? Math.round((fullyRevised / completedChs.length) * 100) : 0;
-    const lastSeenLabel = s.daysSince === null ? "" : s.daysSince === 0 ? "Active today" : `Last active ${s.daysSince}d ago`;
-    return `
+  const cards = subjList
+    .map((s) => {
+      // Revision quality: % of completed chapters with all 4 revisions done
+      const completedChs = (subjectMap[s.subj] || []).filter(
+        (c) => c.status === "Completed",
+      );
+      const fullyRevised = completedChs.filter((c) =>
+        [1, 3, 7, 30].every((n) =>
+          revisions.find(
+            (r) => r.chapterId === c.id && r.dayOffset === n && r.done,
+          ),
+        ),
+      ).length;
+      const revQualityPct =
+        completedChs.length > 0
+          ? Math.round((fullyRevised / completedChs.length) * 100)
+          : 0;
+      const lastSeenLabel =
+        s.daysSince === null
+          ? ""
+          : s.daysSince === 0
+            ? "Active today"
+            : `Last active ${s.daysSince}d ago`;
+      return `
     <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${s.color};border-radius:10px;padding:12px;transition:transform 0.15s,box-shadow 0.15s;cursor:default"
       onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.5)'"
       onmouseleave="this.style.transform='';this.style.boxShadow=''">
@@ -2810,10 +3103,14 @@ function renderSubjectHealth() {
         <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:${_PC.text3};margin-bottom:3px;font-family:${_PC.font}"><span>Done</span><span>${s.done}/${s.syllabusTotal || s.total}</span></div>
         ${_bar(s.pct, s.color, 5)}
       </div>
-      ${completedChs.length > 0 ? `<div style="margin-bottom:6px">
+      ${
+        completedChs.length > 0
+          ? `<div style="margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:${_PC.text3};margin-bottom:3px;font-family:${_PC.font}"><span>Fully revised</span><span>${revQualityPct}%</span></div>
         ${_bar(revQualityPct, _PC.purple, 4)}
-      </div>` : ""}
+      </div>`
+          : ""
+      }
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
         <span style="font-size:0.58rem;color:${_PC.text3};font-family:${_PC.font}">${lastSeenLabel}</span>
         <div style="display:flex;gap:5px;align-items:center">
@@ -2821,17 +3118,21 @@ function renderSubjectHealth() {
         </div>
       </div>
     </div>`;
-  }).join("");
+    })
+    .join("");
 
-  block.innerHTML = _progSection(`
-    ${_progHeader("📊","Subject Health",_PC.yellow)}
+  block.innerHTML = _progSection(
+    `
+    ${_progHeader("📊", "Subject Health", _PC.yellow)}
     <div style="display:flex;gap:6px;margin-bottom:14px">
       ${_statPill("Subjects", subjList.length, _PC.indigo)}
       ${_statPill("Strong", strong, _PC.green)}
       ${_statPill("Danger", danger, danger > 0 ? _PC.red : _PC.text3)}
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${cards}</div>
-  `, `border-top:3px solid ${_PC.yellow};`);
+  `,
+    `border-top:3px solid ${_PC.yellow};`,
+  );
 }
 
 // ── 5. REVISION COVERAGE ──
@@ -2839,33 +3140,70 @@ function renderRevisionCoverage() {
   const block = document.getElementById("prog-revisions-block");
   if (!block) return;
 
-  const completedChapters = chapters.filter(c => c.status === "Completed" && !c.isCustom);
+  const completedChapters = chapters.filter(
+    (c) => c.status === "Completed" && !c.isCustom,
+  );
   const total = completedChapters.length;
 
   if (total === 0) {
-    block.innerHTML = _progSection(_progHeader("🔁","Revision Coverage",_PC.green) + _emptyState("Complete chapters to see revision coverage."), `border-top:3px solid ${_PC.green};`);
+    block.innerHTML = _progSection(
+      _progHeader("🔁", "Revision Coverage", _PC.green) +
+        _emptyState("Complete chapters to see revision coverage."),
+      `border-top:3px solid ${_PC.green};`,
+    );
     return;
   }
 
   const levels = [
-    { n: 1,  label: "R1", full: "1-Day Review",   desc: "Next day",    color: _PC.indigo },
-    { n: 3,  label: "R2", full: "3-Day Review",   desc: "3 days later", color: _PC.purple },
-    { n: 7,  label: "R3", full: "Week Review",    desc: "1 week later", color: _PC.yellow },
-    { n: 30, label: "R4", full: "Month Review",   desc: "1 month later",color: _PC.green  },
+    {
+      n: 1,
+      label: "R1",
+      full: "1-Day Review",
+      desc: "Next day",
+      color: _PC.indigo,
+    },
+    {
+      n: 3,
+      label: "R2",
+      full: "3-Day Review",
+      desc: "3 days later",
+      color: _PC.purple,
+    },
+    {
+      n: 7,
+      label: "R3",
+      full: "Week Review",
+      desc: "1 week later",
+      color: _PC.yellow,
+    },
+    {
+      n: 30,
+      label: "R4",
+      full: "Month Review",
+      desc: "1 month later",
+      color: _PC.green,
+    },
   ];
 
-  const data = levels.map(l => {
-    const done = completedChapters.filter(c =>
-      revisions.find(r => r.chapterId === c.id && r.dayOffset === l.n && r.done)
+  const data = levels.map((l) => {
+    const done = completedChapters.filter((c) =>
+      revisions.find(
+        (r) => r.chapterId === c.id && r.dayOffset === l.n && r.done,
+      ),
     ).length;
     return { ...l, done, pct: Math.round((done / total) * 100) };
   });
 
-  const weights = [0.10, 0.20, 0.30, 0.40];
-  const memScore = Math.round(data.reduce((acc, d, i) => acc + d.pct * weights[i], 0));
-  const memColor = memScore >= 70 ? _PC.green : memScore >= 40 ? _PC.yellow : _PC.red;
+  const weights = [0.1, 0.2, 0.3, 0.4];
+  const memScore = Math.round(
+    data.reduce((acc, d, i) => acc + d.pct * weights[i], 0),
+  );
+  const memColor =
+    memScore >= 70 ? _PC.green : memScore >= 40 ? _PC.yellow : _PC.red;
 
-  const rows = data.map(d => `
+  const rows = data
+    .map(
+      (d) => `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid ${_PC.border}">
       <div style="width:32px;height:32px;border-radius:9px;background:${d.color}18;border:1px solid ${d.color}33;display:flex;align-items:center;justify-content:center;flex-shrink:0;flex-direction:column">
         <span style="font-size:0.6rem;font-weight:900;color:${d.color};font-family:${_PC.font};line-height:1">${d.label}</span>
@@ -2880,10 +3218,13 @@ function renderRevisionCoverage() {
         </div>
         ${_bar(d.pct, d.color, 6)}
       </div>
-    </div>`).join("");
+    </div>`,
+    )
+    .join("");
 
-  block.innerHTML = _progSection(`
-    ${_progHeader("🔁","Revision Coverage",_PC.green)}
+  block.innerHTML = _progSection(
+    `
+    ${_progHeader("🔁", "Revision Coverage", _PC.green)}
     <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:0.68rem;color:${_PC.text2};line-height:1.6;font-family:${_PC.font}">
       When you complete a chapter, the app schedules 4 revision sessions: next day (R1), after 3 days (R2), after 1 week (R3), and after 1 month (R4). Each bar shows how many of your completed chapters have had that revision done. The later the revision, the more it locks in memory.
     </div>
@@ -2894,7 +3235,9 @@ function renderRevisionCoverage() {
     </div>
     <div style="font-size:0.63rem;color:${_PC.text3};font-family:${_PC.font};margin-bottom:10px">Memory Score = weighted average of all 4 revision levels (R4 counts most)</div>
     <div>${rows}</div>
-  `, `border-top:3px solid ${_PC.green};`);
+  `,
+    `border-top:3px solid ${_PC.green};`,
+  );
 }
 
 // ── 6. COACH INSIGHTS ──
@@ -2902,74 +3245,131 @@ function renderIntelligenceReport() {
   const block = document.getElementById("prog-report-block");
   if (!block) return;
   const today = todayStr();
-  const syllabusChaps = chapters.filter(c => !c.isCustom);
+  const syllabusChaps = chapters.filter((c) => !c.isCustom);
   const total = _syllabusGrandTotal() || syllabusChaps.length;
   if (total === 0) {
-    block.innerHTML = _progSection(_progHeader("🧠","Coach Insights",_PC.purple) + _emptyState("Syllabus data unavailable."), `border-top:3px solid ${_PC.purple};`);
+    block.innerHTML = _progSection(
+      _progHeader("🧠", "Coach Insights", _PC.purple) +
+        _emptyState("Syllabus data unavailable."),
+      `border-top:3px solid ${_PC.purple};`,
+    );
     return;
   }
-  const completed = syllabusChaps.filter(c => c.status === "Completed").length;
+  const completed = syllabusChaps.filter(
+    (c) => c.status === "Completed",
+  ).length;
   const insights = [];
 
-  const _deadlineRef = profile ? (profile.deadline || profile.examDate) : null;
+  const _deadlineRef = profile ? profile.deadline || profile.examDate : null;
   if (profile && _deadlineRef) {
-    const daysLeft = Math.max(1, Math.round((dateKeyToUTC(_deadlineRef) - dateKeyToUTC(today)) / 86400000));
+    const daysLeft = Math.max(
+      1,
+      Math.round((dateKeyToUTC(_deadlineRef) - dateKeyToUTC(today)) / 86400000),
+    );
     const remaining = total - completed;
     const paceNeeded = remaining / daysLeft;
     // Match pace tracker: use R1 completedOn dates as actual study days
     const coachActiveDays = new Set(
-      revisions.filter(r => r.done && r.completedOn && r.dayOffset === 1).map(r => r.completedOn)
+      revisions
+        .filter((r) => r.done && r.completedOn && r.dayOffset === 1)
+        .map((r) => r.completedOn),
+    );
+    const coachAddedDays = new Set(
+      chapters.filter((c) => !c.isCustom && c.status === "Completed" && c.dateAdded).map((c) => c.dateAdded)
     );
     let dailyPace = 0;
     if (coachActiveDays.size > 0) {
       dailyPace = completed / coachActiveDays.size;
+    } else if (coachAddedDays.size > 0) {
+      dailyPace = completed / coachAddedDays.size;
     }
-    if (paceNeeded > (dailyPace * 1.2 + 0.1)) {
-      insights.push({ icon: "⚡", color: _PC.red, tag: "URGENT", priority: 1,
-        text: `Need <strong style="color:${_PC.text}">${paceNeeded.toFixed(1)}</strong> chapters/day but averaging <strong style="color:${_PC.text}">${dailyPace.toFixed(1)}</strong>. Gap: <strong style="color:${_PC.red}">${(paceNeeded - dailyPace).toFixed(1)}</strong>/day.` });
+    if (paceNeeded > dailyPace * 1.2 + 0.1) {
+      insights.push({
+        icon: "⚡",
+        color: _PC.red,
+        tag: "URGENT",
+        priority: 1,
+        text: `Need <strong style="color:${_PC.text}">${paceNeeded.toFixed(1)}</strong> chapters/day but averaging <strong style="color:${_PC.text}">${dailyPace.toFixed(1)}</strong>. Gap: <strong style="color:${_PC.red}">${(paceNeeded - dailyPace).toFixed(1)}</strong>/day.`,
+      });
     } else {
-      insights.push({ icon: "✅", color: _PC.green, tag: "ON TRACK", priority: 4,
-        text: `Averaging <strong style="color:${_PC.text}">${dailyPace.toFixed(1)}</strong> chapters/day — pace is solid.` });
+      insights.push({
+        icon: "✅",
+        color: _PC.green,
+        tag: "ON TRACK",
+        priority: 4,
+        text: `Averaging <strong style="color:${_PC.text}">${dailyPace.toFixed(1)}</strong> chapters/day — pace is solid.`,
+      });
     }
     const projDays = dailyPace > 0 ? Math.ceil(remaining / dailyPace) : null;
     if (projDays !== null) {
       const projDate = addDays(today, projDays);
       const targetLabel = profile.deadline ? "your deadline" : "your exam";
-      const buffer = Math.round((dateKeyToUTC(_deadlineRef) - dateKeyToUTC(projDate)) / 86400000);
+      const buffer = Math.round(
+        (dateKeyToUTC(_deadlineRef) - dateKeyToUTC(projDate)) / 86400000,
+      );
       if (buffer < 0) {
-        insights.push({ icon: "🔴", color: _PC.red, tag: "WILL OVERFLOW", priority: 1,
-          text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projDate)}</strong> — <strong style="color:${_PC.red}">${Math.abs(buffer)} days AFTER</strong> ${targetLabel}. Increase your daily pace.` });
+        insights.push({
+          icon: "🔴",
+          color: _PC.red,
+          tag: "WILL OVERFLOW",
+          priority: 1,
+          text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projDate)}</strong> — <strong style="color:${_PC.red}">${Math.abs(buffer)} days AFTER</strong> ${targetLabel}. Increase your daily pace.`,
+        });
       } else if (buffer <= 3) {
-        insights.push({ icon: "🟡", color: _PC.yellow, tag: "TIGHT FINISH", priority: 2,
-          text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projDate)}</strong> — only <strong style="color:${_PC.yellow}">${buffer} day${buffer !== 1 ? "s" : ""} before</strong> ${targetLabel}. No room for error.` });
+        insights.push({
+          icon: "🟡",
+          color: _PC.yellow,
+          tag: "TIGHT FINISH",
+          priority: 2,
+          text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projDate)}</strong> — only <strong style="color:${_PC.yellow}">${buffer} day${buffer !== 1 ? "s" : ""} before</strong> ${targetLabel}. No room for error.`,
+        });
       } else {
-        insights.push({ icon: "🟢", color: _PC.green, tag: "WILL FINISH EARLY", priority: 4,
-          text: `On track to finish <strong style="color:${_PC.text}">${fmtDate(projDate)}</strong> — <strong style="color:${_PC.green}">${buffer} days ahead</strong> of ${targetLabel}.` });
+        insights.push({
+          icon: "🟢",
+          color: _PC.green,
+          tag: "WILL FINISH EARLY",
+          priority: 4,
+          text: `On track to finish <strong style="color:${_PC.text}">${fmtDate(projDate)}</strong> — <strong style="color:${_PC.green}">${buffer} days ahead</strong> of ${targetLabel}.`,
+        });
       }
     }
   }
 
   // Build subjectMap from user-added syllabus chapters
   const subjectMap = {};
-  syllabusChaps.forEach(c => { if (!subjectMap[c.subject]) subjectMap[c.subject] = []; subjectMap[c.subject].push(c); });
+  syllabusChaps.forEach((c) => {
+    if (!subjectMap[c.subject]) subjectMap[c.subject] = [];
+    subjectMap[c.subject].push(c);
+  });
 
   // Build FULL subject list from syllabus — coach knows every subject from day 1
-  const _coachStream = profile ? (profile.stream || "science") : "science";
-  const _coachLang2 = profile ? (profile.lang2 || "hindi") : "hindi";
-  const _coachElective = profile ? (profile.elective || "computer") : "computer";
-  const _coachToLoad = ["english_lang","english_lit","history","civics","geography","maths"];
-  if (_coachStream === "science") _coachToLoad.push("physics","chemistry","biology");
-  else _coachToLoad.push("commerce","economics_g2");
+  const _coachStream = profile ? profile.stream || "science" : "science";
+  const _coachLang2 = profile ? profile.lang2 || "hindi" : "hindi";
+  const _coachElective = profile ? profile.elective || "computer" : "computer";
+  const _coachToLoad = [
+    "english_lang",
+    "english_lit",
+    "history",
+    "civics",
+    "geography",
+    "maths",
+  ];
+  if (_coachStream === "science")
+    _coachToLoad.push("physics", "chemistry", "biology");
+  else _coachToLoad.push("commerce", "economics_g2");
   _coachToLoad.push(_coachLang2, _coachElective);
-  const _MERGE = { "History": "History & Civics", "Civics": "History & Civics" };
+  const _MERGE = { History: "History & Civics", Civics: "History & Civics" };
   const _coachSeen = new Set();
   const _allSyllabusSubjects = [];
   if (window._syllabus) {
-    Object.values(window._syllabus.groups).forEach(group => {
+    Object.values(window._syllabus.groups).forEach((group) => {
       Object.entries(group.subjects).forEach(([key, subj]) => {
         if (!_coachToLoad.includes(key) || subj.chapters.length === 0) return;
         const dn = _MERGE[subj.name] || subj.name;
-        if (!_coachSeen.has(dn)) { _coachSeen.add(dn); _allSyllabusSubjects.push(dn); }
+        if (!_coachSeen.has(dn)) {
+          _coachSeen.add(dn);
+          _allSyllabusSubjects.push(dn);
+        }
       });
     });
   }
@@ -2978,87 +3378,168 @@ function renderIntelligenceReport() {
   const startedSubjectCount = Object.keys(subjectMap).length;
 
   // Loop ALL syllabus subjects — not just user-added ones
-  _allSyllabusSubjects.forEach(subj => {
+  _allSyllabusSubjects.forEach((subj) => {
     const chs = subjectMap[subj] || [];
 
     if (chs.length === 0) {
       // Completely untouched subject — no user-added chapters at all
       const syllTotal = _syllabusTotal(subj) || "?";
-      if (startedSubjectCount >= 4) {
+      const profileAgeDays = profile && profile.dateCreated
+        ? Math.round((dateKeyToUTC(today) - dateKeyToUTC(profile.dateCreated)) / 86400000)
+        : 999;
+      if (startedSubjectCount >= 4 && profileAgeDays >= 7) {
         // User is actively studying other subjects — this silence is now meaningful
-        insights.push({ icon: "🚨", color: _PC.red, tag: "NEGLECTED", priority: 1,
-          text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — not a single chapter added yet. ${syllTotal} chapters waiting.` });
-      } else if (startedSubjectCount >= 1) {
+        insights.push({
+          icon: "🚨",
+          color: _PC.red,
+          tag: "NEGLECTED",
+          priority: 1,
+          text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — not a single chapter added yet. ${syllTotal} chapters waiting.`,
+        });
+      } else if (startedSubjectCount >= 1 && profileAgeDays >= 7) {
         // User just started — gentle nudge, not an alarm
-        insights.push({ icon: "📚", color: _PC.text3, tag: "NOT STARTED", priority: 5,
-          text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — ${syllTotal} chapters, none started yet.` });
+        insights.push({
+          icon: "📚",
+          color: _PC.text3,
+          tag: "NOT STARTED",
+          priority: 5,
+          text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — ${syllTotal} chapters, none started yet.`,
+        });
       }
       return;
     }
 
     // Subject has user-added chapters — use last activity date as before
     const revDates = revisions
-      .filter(r => r.done && r.completedOn && chs.find(c => c.id === r.chapterId))
-      .map(r => r.completedOn).sort().reverse();
-    const addedDates = chs.map(c => c.dateAdded).filter(Boolean).sort().reverse();
+      .filter(
+        (r) => r.done && r.completedOn && chs.find((c) => c.id === r.chapterId),
+      )
+      .map((r) => r.completedOn)
+      .sort()
+      .reverse();
+    const addedDates = chs
+      .map((c) => c.dateAdded)
+      .filter(Boolean)
+      .sort()
+      .reverse();
     const lastDate = revDates[0] || addedDates[0];
     if (!lastDate) return;
-    const daysSince = Math.round((dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000);
-    const done = chs.filter(c => c.status === "Completed").length;
+    const daysSince = Math.round(
+      (dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000,
+    );
+    const done = chs.filter((c) => c.status === "Completed").length;
     if (daysSince > 10) {
-      insights.push({ icon: "🚨", color: _PC.red, tag: "NEGLECTED", priority: 1,
-        text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — ${daysSince} days untouched. ${chs.length - done} chapters remaining.` });
+      insights.push({
+        icon: "🚨",
+        color: _PC.red,
+        tag: "NEGLECTED",
+        priority: 1,
+        text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — ${daysSince} days untouched. ${chs.length - done} chapters remaining.`,
+      });
     } else if (daysSince > 5) {
-      insights.push({ icon: "😬", color: _PC.orange, tag: "SLIPPING", priority: 2,
-        text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> hasn't been touched in ${daysSince} days. ${chs.length - done} left.` });
+      insights.push({
+        icon: "😬",
+        color: _PC.orange,
+        tag: "SLIPPING",
+        priority: 2,
+        text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> hasn't been touched in ${daysSince} days. ${chs.length - done} left.`,
+      });
     }
   });
 
-  const completedChapters = syllabusChaps.filter(c => c.status === "Completed");
-  const fullyRevised = completedChapters.filter(c =>
-    [1,3,7,30].every(n => revisions.find(r => r.chapterId === c.id && r.dayOffset === n && r.done))
+  const completedChapters = syllabusChaps.filter(
+    (c) => c.status === "Completed" &&
+    Math.round((dateKeyToUTC(today) - dateKeyToUTC(c.dateAdded)) / 86400000) > 30,
+  );
+  const fullyRevised = completedChapters.filter((c) =>
+    [1, 3, 7, 30].every((n) =>
+      revisions.find(
+        (r) => r.chapterId === c.id && r.dayOffset === n && r.done,
+      ),
+    ),
   ).length;
-  if (completedChapters.length >= 3 && fullyRevised / completedChapters.length < 0.3) {
-    insights.push({ icon: "📉", color: _PC.yellow, tag: "LOW RETENTION", priority: 2,
-      text: `${completedChapters.length} chapters done but only <strong style="color:${_PC.text}">${fullyRevised}</strong> fully revised. Memory fades without revision.` });
+  if (
+    completedChapters.length >= 3 &&
+    fullyRevised / completedChapters.length < 0.3
+  ) {
+    insights.push({
+      icon: "📉",
+      color: _PC.yellow,
+      tag: "LOW RETENTION",
+      priority: 2,
+      text: `${completed} chapters done, but only <strong style="color:${_PC.text}">${fullyRevised}</strong> fully revised (chapters older than 30 days). Memory fades without revision.`,
+    });
   }
 
   for (let d = 1; d <= 3; d++) {
     const futureDate = addDays(today, d);
-    const dueCount = revisions.filter(r => !r.done && !r.missedPermanently && r.dueDate === futureDate).length;
+    const dueCount = revisions.filter(
+      (r) => !r.done && !r.missedPermanently && r.dueDate === futureDate,
+    ).length;
     if (dueCount >= 4) {
-      insights.push({ icon: "📅", color: _PC.orange, tag: "PILE-UP WARNING", priority: 2,
-        text: `<strong style="color:${_PC.text}">${dueCount} revisions</strong> due on ${fmtDate(futureDate)}. Consider completing some early.` });
+      insights.push({
+        icon: "📅",
+        color: _PC.orange,
+        tag: "PILE-UP WARNING",
+        priority: 2,
+        text: `<strong style="color:${_PC.text}">${dueCount} revisions</strong> due on ${fmtDate(futureDate)}. Consider completing some early.`,
+      });
       break;
     }
   }
 
-  let bestSubj = null, bestPct = -1;
-  Object.keys(subjectMap).forEach(subj => {
-    const pct = subjectMap[subj].filter(c => c.status === "Completed").length / subjectMap[subj].length;
-    if (pct > bestPct) { bestPct = pct; bestSubj = subj; }
+  let bestSubj = null,
+    bestPct = -1;
+  Object.keys(subjectMap).forEach((subj) => {
+    const pct =
+      subjectMap[subj].filter((c) => c.status === "Completed").length /
+      subjectMap[subj].length;
+    if (pct > bestPct) {
+      bestPct = pct;
+      bestSubj = subj;
+    }
   });
-  if (bestSubj && bestPct >= 0.6) {
+  if (bestSubj && bestPct >= 0.6 && subjectMap[bestSubj].length >= 3) {
     const chs = subjectMap[bestSubj];
-    insights.push({ icon: "🔥", color: _PC.green, tag: "BEST SUBJECT", priority: 4,
-      text: `<strong style="color:${_PC.text}">${sanitize(bestSubj)}</strong> — ${chs.filter(c=>c.status==="Completed").length}/${chs.length} done. Keep this energy.` });
+    insights.push({
+      icon: "🔥",
+      color: _PC.green,
+      tag: "BEST SUBJECT",
+      priority: 4,
+      text: `<strong style="color:${_PC.text}">${sanitize(bestSubj)}</strong> — ${chs.filter((c) => c.status === "Completed").length}/${chs.length} done. Keep this energy.`,
+    });
   }
 
-  const weakCount = chapters.filter(c => c.isWeak).length;
+  const weakCount = chapters.filter((c) => c.isWeak).length;
   if (weakCount > 0) {
-    insights.push({ icon: "⚠️", color: _PC.yellow, tag: "WEAK SPOTS", priority: 2,
-      text: `<strong style="color:${_PC.text}">${weakCount}</strong> chapter${weakCount > 1 ? "s" : ""} flagged as weak. These need extra revision cycles.` });
+    insights.push({
+      icon: "⚠️",
+      color: _PC.yellow,
+      tag: "WEAK SPOTS",
+      priority: 2,
+      text: `<strong style="color:${_PC.text}">${weakCount}</strong> chapter${weakCount > 1 ? "s" : ""} flagged as weak. These need extra revision cycles.`,
+    });
   }
 
   // NOT ADDED YET — only for subjects partially tracked (>0 added but gaps remain)
   // Fully untouched subjects (0 added) are already handled above by NEGLECTED/NOT STARTED
   if (window._syllabus) {
-    _allSyllabusSubjects.forEach(subj => {
+    _allSyllabusSubjects.forEach((subj) => {
       const syllTotal = _syllabusTotal(subj);
       const added = (subjectMap[subj] || []).length;
-      if (syllTotal && added > 0 && added < syllTotal && (syllTotal - added) >= 3) {
-        insights.push({ icon: "📚", color: _PC.indigo, tag: "NOT ADDED YET", priority: 3,
-          text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — ${added} of ${syllTotal} chapters tracked. <strong style="color:${_PC.indigo}">${syllTotal - added} missing</strong>.` });
+      if (
+        syllTotal &&
+        added > 0 &&
+        added < syllTotal &&
+        syllTotal - added >= 3
+      ) {
+        insights.push({
+          icon: "📚",
+          color: _PC.indigo,
+          tag: "NOT ADDED YET",
+          priority: 3,
+          text: `<strong style="color:${_PC.text}">${sanitize(subj)}</strong> — ${added} of ${syllTotal} chapters tracked. <strong style="color:${_PC.indigo}">${syllTotal - added} missing</strong>.`,
+        });
       }
     });
   }
@@ -3066,23 +3547,35 @@ function renderIntelligenceReport() {
   insights.sort((a, b) => (a.priority || 3) - (b.priority || 3));
 
   const shown = insights.slice(0, 10);
-  const cards = shown.map((i, idx) => `
-    <div style="display:flex;gap:12px;padding:12px;background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${i.color};border-radius:10px;animation:progFadeUp 0.4s cubic-bezier(.4,0,.2,1) ${(idx*0.06).toFixed(2)}s both">
+  const cards = shown
+    .map(
+      (i, idx) => `
+    <div style="display:flex;gap:12px;padding:12px;background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${i.color};border-radius:10px;animation:progFadeUp 0.4s cubic-bezier(.4,0,.2,1) ${(idx * 0.06).toFixed(2)}s both">
       <span style="font-size:1.05rem;flex-shrink:0;margin-top:1px">${i.icon}</span>
       <div style="flex:1;min-width:0">
         <span style="font-size:0.54rem;font-weight:800;letter-spacing:0.1em;color:${i.color};background:${i.color}18;padding:2px 7px;border-radius:99px;display:inline-block;margin-bottom:5px;border:1px solid ${i.color}33;font-family:${_PC.font}">${i.tag}</span>
         <div style="font-size:0.75rem;color:${_PC.text2};line-height:1.6;font-family:${_PC.font}">${i.text}</div>
       </div>
-    </div>`).join("");
+    </div>`,
+    )
+    .join("");
 
-  block.innerHTML = _progSection(`
-    ${_progHeader("🧠","Coach Insights",_PC.purple,
-      `<span style="font-size:0.6rem;color:${_PC.text3};font-family:${_PC.font}">${shown.length} insight${shown.length !== 1 ? "s" : ""}</span>`
+  block.innerHTML = _progSection(
+    `
+    ${_progHeader(
+      "🧠",
+      "Coach Insights",
+      _PC.purple,
+      `<span style="font-size:0.6rem;color:${_PC.text3};font-family:${_PC.font}">${shown.length} insight${shown.length !== 1 ? "s" : ""}</span>`,
     )}
-    ${insights.length > 0
-      ? `<div style="display:flex;flex-direction:column;gap:8px">${cards}</div>`
-      : _emptyState("Not enough data yet.")}
-  `, `border-top:3px solid ${_PC.purple};`);
+    ${
+      insights.length > 0
+        ? `<div style="display:flex;flex-direction:column;gap:8px">${cards}</div>`
+        : _emptyState("Not enough data yet.")
+    }
+  `,
+    `border-top:3px solid ${_PC.purple};`,
+  );
 }
 
 // ── TOGGLE WEAK ──
@@ -3101,7 +3594,8 @@ function initApp() {
   renderAll();
   checkSyllabusProfile();
   // Only render progress on boot if the tab is already active (e.g. after a refresh on that tab)
-  if (document.getElementById("tab-progress").classList.contains("active")) renderProgress();
+  if (document.getElementById("tab-progress").classList.contains("active"))
+    renderProgress();
   showNotifModal();
   registerSW();
   checkNotifBanner();
@@ -3120,17 +3614,34 @@ function toggleGroupCode() {
   btn.textContent = isOpen ? "🔑 Show Group Code" : "🔒 Hide Code";
 }
 
+function toggleDrawerAccordion(id) {
+  const body = document.getElementById(id);
+  const chevron = document.getElementById(id + "-chevron");
+  if (!body) return;
+  const isOpen = body.style.display !== "none";
+  body.style.display = isOpen ? "none" : "block";
+  if (chevron) chevron.classList.toggle("acc-open", !isOpen);
+}
+
 function openProfile() {
   if (!profile) {
-    showToast("Pehle onboarding complete karo!", "error", "Profile tab access karne ke liye apna naam set karo.");
+    showToast(
+      "Pehle onboarding complete karo!",
+      "error",
+      "Profile tab access karne ke liye apna naam set karo.",
+    );
     return;
   }
   document.getElementById("prof-name").value = profile.name || "";
   document.getElementById("prof-class").value = profile.cls || "10";
   document.getElementById("prof-exam").value = profile.examDate || "";
-  if (document.getElementById("prof-stream")) document.getElementById("prof-stream").value = profile.stream || "science";
-  if (document.getElementById("prof-lang2")) document.getElementById("prof-lang2").value = profile.lang2 || "hindi";
-  if (document.getElementById("prof-elective")) document.getElementById("prof-elective").value = profile.elective || "computer";
+  if (document.getElementById("prof-stream"))
+    document.getElementById("prof-stream").value = profile.stream || "science";
+  if (document.getElementById("prof-lang2"))
+    document.getElementById("prof-lang2").value = profile.lang2 || "hindi";
+  if (document.getElementById("prof-elective"))
+    document.getElementById("prof-elective").value =
+      profile.elective || "computer";
   if (document.getElementById("prof-deadline")) {
     document.getElementById("prof-deadline").value = profile.deadline || "";
     if (profile.examDate) updateProfileDeadlineLimits();
@@ -3162,11 +3673,7 @@ function openProfile() {
   } else {
     document.getElementById("examCountdownBlock").style.display = "none";
   }
-  // group info
-  const gi = document.getElementById("prof-group-info");
-  gi.innerHTML = groupCode
-    ? `<strong>Status</strong>In group <span style="color:var(--indigo);font-weight:700">${groupCode}</span> as "${sanitize(groupName)}"`
-    : `<strong>Status</strong>Not in any group.`;
+  // group info — now shown in group tab, not sidebar
   // open
   setProfileEditMode(false);
   document.getElementById("profileOverlay").style.display = "block";
@@ -3175,6 +3682,11 @@ function openProfile() {
 
 function closeProfile() {
   document.body.classList.remove("prof-open");
+  // reset profile accordion to closed
+  const accBody = document.getElementById("acc-profile");
+  const accChevron = document.getElementById("acc-profile-chevron");
+  if (accBody) accBody.style.display = "none";
+  if (accChevron) accChevron.classList.remove("acc-open");
   setTimeout(() => {
     document.getElementById("profileOverlay").style.display = "none";
   }, 280);
@@ -3183,27 +3695,42 @@ function closeProfile() {
 function saveProfile() {
   const name = document.getElementById("prof-name").value.trim();
   if (!name) {
-    showToast("Bina naam ke to bhoot bhi nahi aate! 👻🚫", "error", "Pehle naam toh likho.");
+    showToast(
+      "Bina naam ke to bhoot bhi nahi aate! 👻🚫",
+      "error",
+      "Pehle naam toh likho.",
+    );
     return;
   }
-  const newDeadline = document.getElementById("prof-deadline") ? document.getElementById("prof-deadline").value : "";
-  const newExam     = document.getElementById("prof-exam").value;
+  const newDeadline = document.getElementById("prof-deadline")
+    ? document.getElementById("prof-deadline").value
+    : "";
+  const newExam = document.getElementById("prof-exam").value;
   if (newExam && newDeadline) {
     const err = _validateDeadline(newDeadline, newExam);
-    if (err) { showToast(err, "error", "Invalid deadline"); return; }
+    if (err) {
+      showToast(err, "error", "Invalid deadline");
+      return;
+    }
   }
-  const oldStream   = profile.stream;
-  const oldLang2    = profile.lang2;
+  const oldStream = profile.stream;
+  const oldLang2 = profile.lang2;
   const oldElective = profile.elective;
-  profile.name     = name;
-  profile.cls      = document.getElementById("prof-class").value;
+  profile.name = name;
+  profile.cls = document.getElementById("prof-class").value;
   profile.examDate = newExam;
-  profile.deadline = newDeadline || profile.deadline || "";
-  if (document.getElementById("prof-stream")) profile.stream = document.getElementById("prof-stream").value;
-  if (document.getElementById("prof-lang2")) profile.lang2 = document.getElementById("prof-lang2").value;
-  if (document.getElementById("prof-elective")) profile.elective = document.getElementById("prof-elective").value;
+  profile.deadline = newDeadline || "";
+  if (document.getElementById("prof-stream"))
+    profile.stream = document.getElementById("prof-stream").value;
+  if (document.getElementById("prof-lang2"))
+    profile.lang2 = document.getElementById("prof-lang2").value;
+  if (document.getElementById("prof-elective"))
+    profile.elective = document.getElementById("prof-elective").value;
   localStorage.setItem("st_profile", JSON.stringify(profile));
-  const streamChanged = oldStream !== profile.stream || oldLang2 !== profile.lang2 || oldElective !== profile.elective;
+  const streamChanged =
+    oldStream !== profile.stream ||
+    oldLang2 !== profile.lang2 ||
+    oldElective !== profile.elective;
   rebuildSubjectsFromSyllabus();
   if (streamChanged) {
     // subjects array is now rebuilt to reflect new stream/lang2/elective
@@ -3212,21 +3739,25 @@ function saveProfile() {
     // (covers elective swap, lang2 swap, and stream swap — all identical logic)
     const removedIds = new Set(
       chapters
-        .filter(c => !c.isCustom && !validSubjectNames.has(c.subject))
-        .map(c => c.id)
+        .filter((c) => !c.isCustom && !validSubjectNames.has(c.subject))
+        .map((c) => c.id),
     );
-    chapters = chapters.filter(c => !removedIds.has(c.id));
-    revisions = revisions.filter(r => !removedIds.has(r.chapterId));
-  
-      // Clean up missedRevisions — legacy entries may lack chapterId so also filter by subject name
-      missedRevisions = missedRevisions.filter(r =>
-        !removedIds.has(r.chapterId) && validSubjectNames.has(r.subject)
-      );
-      // weeklyLog and streak intentionally kept:
-      // bars show real study activity regardless of which subject — history belongs to the user
-      // streak tracks daily consistency — swapping a subject doesn't undo legitimate study days
-      save();
-      showToast("Subject swap! 🔄", "", "Old subject chapters cleared. Add new ones to get started.");
+    chapters = chapters.filter((c) => !removedIds.has(c.id));
+    revisions = revisions.filter((r) => !removedIds.has(r.chapterId));
+
+    // Clean up missedRevisions — legacy entries may lack chapterId so also filter by subject name
+    missedRevisions = missedRevisions.filter(
+      (r) => !removedIds.has(r.chapterId) && validSubjectNames.has(r.subject),
+    );
+    // weeklyLog and streak intentionally kept:
+    // bars show real study activity regardless of which subject — history belongs to the user
+    // streak tracks daily consistency — swapping a subject doesn't undo legitimate study days
+    save();
+    showToast(
+      "Subject swap! 🔄",
+      "",
+      "Old subject chapters cleared. Add new ones to get started.",
+    );
   }
   // Rebuild Add tab dropdown and chapter suggestions with the new subject list
   populateSubjectDropdown();
@@ -3292,9 +3823,13 @@ function cancelProfileEdit() {
   if (document.getElementById("prof-deadline")) {
     document.getElementById("prof-deadline").value = profile.deadline || "";
   }
-  if (document.getElementById("prof-stream")) document.getElementById("prof-stream").value = profile.stream || "science";
-  if (document.getElementById("prof-lang2")) document.getElementById("prof-lang2").value = profile.lang2 || "hindi";
-  if (document.getElementById("prof-elective")) document.getElementById("prof-elective").value = profile.elective || "computer";
+  if (document.getElementById("prof-stream"))
+    document.getElementById("prof-stream").value = profile.stream || "science";
+  if (document.getElementById("prof-lang2"))
+    document.getElementById("prof-lang2").value = profile.lang2 || "hindi";
+  if (document.getElementById("prof-elective"))
+    document.getElementById("prof-elective").value =
+      profile.elective || "computer";
   setProfileEditMode(false);
   showToast(
     "Purani yaadein hi achhi thin... 🔙🚫",
@@ -3349,7 +3884,7 @@ async function loadSyllabusAndInit() {
     localStorage.setItem("st_profile", JSON.stringify(profile));
   }
   migrateOldData();
- initApp();
+  initApp();
 }
 
 function _hardResetIfNeeded() {
@@ -3377,17 +3912,19 @@ function migrateOldData() {
   }
 
   // Migration 1 — backfill isCustom on all existing chapters that don't have it
-  const needsCustomCheck = chapters.filter(c => c.isCustom === undefined);
+  const needsCustomCheck = chapters.filter((c) => c.isCustom === undefined);
   if (needsCustomCheck.length > 0) {
     const aliases = { "History & Civics": ["History", "Civics"] };
-    needsCustomCheck.forEach(ch => {
+    needsCustomCheck.forEach((ch) => {
       const lookFor = aliases[ch.subject] || [ch.subject];
       let found = false;
       outer: for (const group of Object.values(window._syllabus.groups)) {
         for (const subj of Object.values(group.subjects)) {
           if (lookFor.includes(subj.name)) {
             for (const s of subj.chapters) {
-              if (s.name.trim().toLowerCase() === ch.name.trim().toLowerCase()) {
+              if (
+                s.name.trim().toLowerCase() === ch.name.trim().toLowerCase()
+              ) {
                 found = true;
                 break outer;
               }
@@ -3401,14 +3938,14 @@ function migrateOldData() {
   }
 
   // Migration 2 — fix old History/Civics chapters stored with raw subject names
-  chapters.forEach(ch => {
+  chapters.forEach((ch) => {
     if (ch.subject === "History" || ch.subject === "Civics") {
       ch.subject = "History & Civics";
       dirty = true;
     }
   });
   // Fix revisions too
-  revisions.forEach(r => {
+  revisions.forEach((r) => {
     if (r.subject === "History" || r.subject === "Civics") {
       r.subject = "History & Civics";
       dirty = true;
@@ -3423,21 +3960,7 @@ function migrateOldData() {
       dirty = true;
     }
   }
-
-  // Migration 4 — wipe auto-preloaded syllabus ghost chapters
-  // (Not Started, isCustom false, zero revisions = user never touched them)
-  const ghostChapters = chapters.filter(c =>
-    c.isCustom === false &&
-    c.status === "Not Started" &&
-    !revisions.some(r => r.chapterId === c.id)
-  );
-  if (ghostChapters.length > 0) {
-    const ghostIds = new Set(ghostChapters.map(c => c.id));
-    chapters = chapters.filter(c => !ghostIds.has(c.id));
-    dirty = true;
-  }
-
-  if (dirty) save();
+   if (dirty) save();
 }
 
 function autoLoadSyllabusChapters_DISABLED() {
@@ -3474,13 +3997,16 @@ function autoLoadSyllabusChapters_DISABLED() {
   });
 
   // Preserve custom chapters and their revisions — only wipe syllabus chapters
-  const customChapters = chapters.filter(c => c.isCustom);
-  const customIds = new Set(customChapters.map(c => c.id));
+  const customChapters = chapters.filter((c) => c.isCustom);
+  const customIds = new Set(customChapters.map((c) => c.id));
   chapters = customChapters;
-  revisions = revisions.filter(r => customIds.has(r.chapterId));
+  revisions = revisions.filter((r) => customIds.has(r.chapterId));
 
   // History and Civics are separate in syllabus but merged as one subject in app
-  const SUBJECT_MERGE = { "History": "History & Civics", "Civics": "History & Civics" };
+  const SUBJECT_MERGE = {
+    History: "History & Civics",
+    Civics: "History & Civics",
+  };
 
   // Add chapters for each selected subject (skip empty ones)
   const today = todayStr();
