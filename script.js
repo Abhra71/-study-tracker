@@ -915,7 +915,7 @@ function addChapter() {
   // Check if this chapter exists in the preloaded syllabus
   let isCustom = true;
   if (window._syllabus) {
-    const aliases = { "History & Civics": ["History", "Civics"] };
+   const aliases = { "History & Civics": ["Civics", "History"] };
     const lookFor = aliases[subject] || [subject];
     outer: for (const group of Object.values(window._syllabus.groups)) {
       for (const subj of Object.values(group.subjects)) {
@@ -2117,7 +2117,7 @@ function updateChapterSuggestions() {
   const inp = document.getElementById("chapterName");
   if (!sel) return;
   const selectedSubject = document.getElementById("subjectSelect").value;
-  const aliases = { "History & Civics": ["History", "Civics"] };
+ const aliases = { "History & Civics": ["Civics", "History"] };
   const lookFor = aliases[selectedSubject] || [selectedSubject];
   const addedNames = new Set(
     chapters.filter(c => c.subject === selectedSubject).map(c => c.name.trim().toLowerCase())
@@ -2267,7 +2267,7 @@ function _clearDeadline() {
 // ── SHARED UTIL ──
 function _syllabusTotal(subjectName) {
   if (!window._syllabus) return null;
-  const aliases = { "History & Civics": ["History", "Civics"] };
+const aliases = { "History & Civics": ["Civics", "History"] };
   const lookFor = aliases[subjectName] || [subjectName];
   let count = 0;
   Object.values(window._syllabus.groups).forEach(group => {
