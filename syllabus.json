@@ -44,30 +44,22 @@
           "book": "APC Modern Indian History",
           "color": "#d97706",
           "chapters": [
-            { "id": "his_01", "name": "The First War of Independence, 1857" },
-            { "id": "his_02", "name": "Growth of Nationalism" },
-            {
-              "id": "his_03",
-              "name": "First Phase of the Indian National Movement (1885–1907)"
-            },
-            {
-              "id": "his_04",
-              "name": "Second Phase of the Indian National Movement (1905–1916)"
-            },
-            { "id": "his_05", "name": "The Muslim League" },
-            {
-              "id": "his_06",
-              "name": "Mahatma Gandhi and the National Movement"
-            },
-            { "id": "his_07", "name": "Quit India Movement" },
-            { "id": "his_08", "name": "Forward Bloc and The INA" },
-            { "id": "his_09", "name": "Independence and Partition of India" },
-            { "id": "his_10", "name": "The First World War" },
-            { "id": "his_11", "name": "Rise of Dictatorships" },
-            { "id": "his_12", "name": "The Second World War" },
-            { "id": "his_13", "name": "United Nations" },
-            { "id": "his_14", "name": "Major Agencies of the United Nations" },
-            { "id": "his_15", "name": "Non-Aligned Movement" }
+            { "id": "his_01", "name": "The First War Of Independence (1857)" },
+            { "id": "his_02", "name": "Factors Leading To The Growth Of Nationalism And Foundation Of The Indian National Congress" },
+            { "id": "his_03", "name": "Objectives And Methods Of Struggle Of The Early Nationalists" },
+            { "id": "his_04", "name": "Second Phase Of The Indian National Movement: Partition Of Bengal And Other Developments" },
+            { "id": "his_05", "name": "Muslim League And Its Objectives" },
+            { "id": "his_06", "name": "National Movement During The First World War: Lucknow Pact And Other Developments" },
+            { "id": "his_07", "name": "National Movement: 1919–1934" },
+            { "id": "his_08", "name": "The Cripps Mission And The Quit India Movement" },
+            { "id": "his_09", "name": "Subhash Chandra Bose, Forward Bloc And Indian National Army (INA)" },
+            { "id": "his_10", "name": "Independence And The Partition Of India" },
+            { "id": "his_11", "name": "The First World War (1914–1918)" },
+            { "id": "his_12", "name": "Rise Of Dictatorships: Fascism In Italy And Nazism In Germany" },
+            { "id": "his_13", "name": "The Second World War (1939–1945)" },
+            { "id": "his_14", "name": "United Nations Organization: Origin, Objectives And The Principal Organs" },
+            { "id": "his_15", "name": "Major Agencies Of The United Nations" },
+            { "id": "his_16", "name": "The Non-Aligned Movement" }
           ]
         },
         "civics": {
@@ -75,17 +67,12 @@
           "book": "APC Modern Indian History",
           "color": "#b45309",
           "chapters": [
-            {
-              "id": "civ_01",
-              "name": "The Union Parliament (Lok Sabha & Rajya Sabha)"
-            },
-            { "id": "civ_02", "name": "The President and The Vice-President" },
-            {
-              "id": "civ_03",
-              "name": "Prime Minister and Council of Ministers"
-            },
-            { "id": "civ_04", "name": "The Supreme Court" },
-            { "id": "civ_05", "name": "The High Courts and Subordinate Courts" }
+            { "id": "civ_01", "name": "The Union Parliament" },
+            { "id": "civ_02", "name": "The Union Executive: The President and the Vice-President" },
+            { "id": "civ_03", "name": "The Union Executive: The Prime Minister, Union Cabinet" },
+            { "id": "civ_04", "name": "The Union Judiciary: The Supreme Court" },
+            { "id": "civ_05", "name": "The State Judiciary: The High Courts" },
+            { "id": "civ_06", "name": "The Subordinate Courts" }
           ]
         },
         "geography": {
@@ -93,36 +80,20 @@
           "book": "Frank Modern Certificate Geography Part II",
           "color": "#059669",
           "chapters": [
-            {
-              "id": "geo_01",
-              "name": "Map Study: Interpretation of Topographical Maps"
-            },
+            { "id": "geo_01", "name": "Map Study: Interpretation of Topographical Maps" },
             { "id": "geo_02", "name": "Maps of India" },
-            {
-              "id": "geo_03",
-              "name": "Location, Extent and Physical Features of India"
-            },
-            { "id": "geo_04", "name": "Climate of India" },
-            { "id": "geo_05", "name": "Soils in India" },
-            { "id": "geo_06", "name": "Natural Vegetation of India" },
-            { "id": "geo_07", "name": "Water Resources" },
-            { "id": "geo_08", "name": "Minerals in India" },
-            { "id": "geo_09", "name": "India — Energy Resources" },
-            { "id": "geo_10", "name": "Agriculture in India" },
-            {
-              "id": "geo_11",
-              "name": "Food Crops (Rice, Wheat, Millets, Pulses)"
-            },
-            { "id": "geo_12", "name": "Commercial or Cash Crops" },
-            {
-              "id": "geo_13",
-              "name": "Distribution of Crops and Their Requirements"
-            },
-            { "id": "geo_14", "name": "Industries in India (Mineral Based)" },
-            { "id": "geo_15", "name": "Agro-Based Industries" },
-            { "id": "geo_16", "name": "Transport" },
-            { "id": "geo_17", "name": "Waste Management — I" },
-            { "id": "geo_18", "name": "Waste Management — II" }
+            { "id": "geo_03", "name": "Climate" },
+            { "id": "geo_04", "name": "Soil Resources" },
+            { "id": "geo_05", "name": "Natural Vegetation" },
+            { "id": "geo_06", "name": "Water Resources" },
+            { "id": "geo_07", "name": "Mineral & Energy Resources" },
+            { "id": "geo_08", "name": "Agriculture in India — I" },
+            { "id": "geo_09", "name": "Agriculture in India — II" },
+            { "id": "geo_10", "name": "Manufacturing Industries: Mineral-Based" },
+            { "id": "geo_11", "name": "Manufacturing Industries: Agro-Based" },
+            { "id": "geo_12", "name": "Transport" },
+            { "id": "geo_13", "name": "Waste Management — I" },
+            { "id": "geo_14", "name": "Waste Management — II" }
           ]
         }
       }
