@@ -50,6 +50,7 @@ let coins = parseInt(localStorage.getItem("st_coins") || "0", 10);
 let currentFilter = "all";
 let missedRevisions = JSON.parse(localStorage.getItem("st_missed")) || [];
 let graceTimerInterval = null;
+let flipClockInterval = null;
 let groupCode = localStorage.getItem("st_group") || "";
 let groupName = localStorage.getItem("st_grpname") || "";
 let lbUnsubscribe = null;
@@ -533,6 +534,7 @@ function finishOnboard() {
     elective,
     deadline: deadline || "",
     dateCreated: todayStr(),
+    setupSeen: !!(exam && deadline),
   };
   localStorage.setItem("st_profile", JSON.stringify(profile));
   document.getElementById("onboardOverlay").classList.add("hidden");
@@ -577,6 +579,13 @@ function updateDeadlineLimits() {
     field.style.display = "none";
     return;
   }
+  const daysToExam = Math.round(
+    (dateKeyToUTC(exam) - dateKeyToUTC(todayStr())) / 86400000,
+  );
+  if (daysToExam < 15) {
+    field.style.display = "none";
+    return;
+  }
   field.style.display = "block";
   const { minDate, maxDate, minLabel, maxLabel } = _deadlineBounds(exam);
   inp.min = minDate;
@@ -589,14 +598,141 @@ function updateProfileDeadlineLimits() {
   const hint = document.getElementById("prof-deadline-hint");
   const inp = document.getElementById("prof-deadline");
   if (!exam || !hint || !inp) return;
+  if (profile && profile.examDate && exam !== profile.examDate) {
+    inp.value = "";
+  }
+  const daysToExam = Math.round(
+    (dateKeyToUTC(exam) - dateKeyToUTC(todayStr())) / 86400000,
+  );
+  const wrapper = inp.closest(".field");
+  if (daysToExam < 15) {
+    if (wrapper) wrapper.style.display = "none";
+    hint.textContent = "";
+    return;
+  }
+  const _psCheck = _computePaceState();
+  if (_psCheck && _psCheck.isEmergency) {
+    if (wrapper) wrapper.style.display = "none";
+    hint.textContent =
+      "Deadline has passed and you're in emergency mode — focus on chapters, not dates.";
+    return;
+  }
+  if (wrapper) wrapper.style.display = "";
   const { minDate, maxDate, minLabel, maxLabel } = _deadlineBounds(exam);
   inp.min = minDate;
   inp.max = maxDate;
-  hint.textContent = `Between ${minLabel} and ${maxLabel}.`;
+  const _ps9b = _computePaceState();
+  const _sug9b = (() => {
+    if (!_ps9b || _ps9b.effectivePace <= 0 || _ps9b.remaining === 0)
+      return null;
+    const _buf = _ps9b.paceSlipping ? 10 : _ps9b.paceImproving ? 3 : 5;
+    const _proj = addDays(
+      todayStr(),
+      Math.ceil(_ps9b.remaining / _ps9b.effectivePace) + _buf,
+    );
+    const _min = addDays(exam, -60);
+    const _max = addDays(exam, -10);
+    if (dateKeyToUTC(_proj) > dateKeyToUTC(_max)) return null;
+    if (dateKeyToUTC(_proj) < dateKeyToUTC(_min))
+      return { key: _min, label: fmtDate(_min) };
+    return { key: _proj, label: fmtDate(_proj) };
+  })();
+  const _hasDeadline9b = profile && profile.deadline;
+  const _behindDeadline9b =
+    _hasDeadline9b &&
+    _sug9b &&
+    dateKeyToUTC(_sug9b.key) > dateKeyToUTC(profile.deadline);
+  hint.textContent = _behindDeadline9b
+    ? `Between ${minLabel} and ${maxLabel}. At your current pace: ${_sug9b.label} — later than your existing deadline. Pushing it back won't change the work needed.`
+    : _sug9b
+      ? `Between ${minLabel} and ${maxLabel}. Suggested: ${_sug9b.label} — based on your current pace.`
+      : `Between ${minLabel} and ${maxLabel}.`;
 }
 
 // ── GREETING ──
+function _setupNotReady() {
+  if (!profile) return;
+  const noExam = !profile.examDate;
+  const dte = profile.examDate
+    ? Math.max(
+        0,
+        Math.round(
+          (dateKeyToUTC(profile.examDate) - dateKeyToUTC(todayStr())) /
+            86400000,
+        ),
+      )
+    : null;
+  const noDeadline = !profile.deadline && (dte === null || dte >= 15);
+  if (noExam && noDeadline) {
+    showToast(
+      "Exam date and deadline missing",
+      "error",
+      "Set both in Profile to unlock.",
+    );
+  } else if (noExam) {
+    showToast("Exam date missing", "error", "Set it in Profile → Exam Date.");
+  } else if (noDeadline) {
+    showToast("Study deadline missing", "error", "Set it in the Progress tab.");
+  }
+}
+
+function _setupDismiss() {
+  if (!profile) return;
+  const _dte = profile.examDate
+    ? Math.max(
+        0,
+        Math.round(
+          (dateKeyToUTC(profile.examDate) - dateKeyToUTC(todayStr())) /
+            86400000,
+        ),
+      )
+    : null;
+  const _noExam = !profile.examDate;
+  const _noDeadline = !profile.deadline && (_dte === null || _dte >= 15);
+
+  if (_noExam && _noDeadline) {
+    showConfirmModal(
+      "Your exam date and study deadline are not set yet. Sure you want to dismiss?",
+      () => {
+        profile.setupSeen = true;
+        localStorage.setItem("st_profile", JSON.stringify(profile));
+        renderCoachTab();
+      },
+    );
+  } else if (_noExam) {
+    showConfirmModal(
+      "Your exam date is not set yet — without it the app can't track anything. Sure you want to dismiss?",
+      () => {
+        profile.setupSeen = true;
+        localStorage.setItem("st_profile", JSON.stringify(profile));
+        renderCoachTab();
+      },
+    );
+  } else if (_noDeadline) {
+    showConfirmModal(
+      "Your study deadline is not set yet — pace calculations won't be personalised. Sure you want to dismiss?",
+      () => {
+        profile.setupSeen = true;
+        localStorage.setItem("st_profile", JSON.stringify(profile));
+        renderCoachTab();
+      },
+    );
+  } else {
+    profile.setupSeen = true;
+    localStorage.setItem("st_profile", JSON.stringify(profile));
+    renderCoachTab();
+  }
+}
+
+function _updateHamInitial() {
+  const el = document.getElementById("ham-initial");
+  if (!el) return;
+  const name = profile && profile.name ? profile.name.trim() : "";
+  el.textContent = name ? name.charAt(0).toUpperCase() : "?";
+}
+
 function updateGreeting() {
+  _updateHamInitial();
   if (!profile) {
     document.getElementById("greeting").textContent = "";
     return;
@@ -716,6 +852,640 @@ function updateExamCountdown() {
   }
 }
 
+// ── FLIP CLOCK COUNTDOWN ──
+function renderFlipClock() {
+  const el = document.getElementById("today-flip-clock");
+  if (!el) return;
+
+  if (flipClockInterval) {
+    clearInterval(flipClockInterval);
+    flipClockInterval = null;
+  }
+
+  if (!profile || !profile.examDate) {
+    el.innerHTML = "";
+    delete el.dataset.built;
+    delete el.dataset.prev;
+    const _box = document.getElementById("today-mission");
+    if (_box) _box.style.display = "none";
+    return;
+  }
+  const _box = document.getElementById("today-mission");
+  if (_box) _box.style.display = "";
+
+  function _render() {
+    // Guard — exam date cleared while interval was running
+    if (!profile || !profile.examDate) {
+      if (flipClockInterval) {
+        clearInterval(flipClockInterval);
+        flipClockInterval = null;
+      }
+      el.innerHTML = "";
+      delete el.dataset.built;
+      delete el.dataset.prev;
+      const _box2 = document.getElementById("today-mission");
+      if (_box2) _box2.style.display = "none";
+      return;
+    }
+
+    const now = new Date();
+    const [ey, em, ed] = profile.examDate.split("-").map(Number);
+    const examMidnightIST = new Date(
+      Date.UTC(ey, em - 1, ed, 0, 0, 0) - 5.5 * 3600000,
+    );
+    const diff = examMidnightIST - now;
+
+    if (diff <= 0) {
+      el.innerHTML = `<div class="today-flip-clock-wrap"><div class="today-flip-goodluck">🎓 Good luck!</div></div>`;
+      if (flipClockInterval) {
+        clearInterval(flipClockInterval);
+        flipClockInterval = null;
+      }
+      delete el.dataset.built;
+      delete el.dataset.prev;
+      return;
+    }
+
+    // Days = pure IST calendar difference (always correct regardless of time of day)
+    const todayIST = todayStr();
+    const calDays = Math.round(
+      (dateKeyToUTC(profile.examDate) - dateKeyToUTC(todayIST)) / 86400000,
+    );
+
+    // Hours/mins/secs = time left within today IST until midnight IST
+    const [ty, tm, td] = todayIST.split("-").map(Number);
+    const tomorrowMidnightIST = new Date(
+      Date.UTC(ty, tm - 1, td, 0, 0, 0) - 5.5 * 3600000 + 86400000,
+    );
+    const secsLeft = Math.max(
+      0,
+      Math.floor((tomorrowMidnightIST - now) / 1000),
+    );
+    const days = calDays;
+    const hours = Math.floor(secsLeft / 3600);
+    const minutes = Math.floor((secsLeft % 3600) / 60);
+    const seconds = secsLeft % 60;
+
+    // Days uses 3 digits when >= 100, 2 digits otherwise
+    const padDays = (n) => (n >= 100 ? String(n) : String(n).padStart(2, "0"));
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    const units = [
+      { val: padDays(days), label: "Days" },
+      { val: pad2(hours), label: "Hours" },
+      { val: pad2(minutes), label: "Mins" },
+      { val: pad2(seconds), label: "Secs" },
+    ];
+
+    // If digit count of days changed (e.g. 100 → 99 or 99 → 100), force full rebuild
+    const prevDaysLen = el.dataset.prevDaysLen || "2";
+    const currDaysLen = String(units[0].val).length;
+    if (currDaysLen !== parseInt(prevDaysLen)) {
+      delete el.dataset.built;
+    }
+
+    // First render — build full HTML
+    if (!el.dataset.built) {
+      el.dataset.built = "1";
+      el.dataset.prevDaysLen = String(currDaysLen);
+      let html = `<div class="today-flip-clock-wrap">
+        <div class="today-flip-clock-label">Exam Countdown</div>
+        <div class="today-flip-clock-units">`;
+      units.forEach((u, i) => {
+        const digits = u.val.split("");
+        const cards = digits
+          .map(
+            (ch, d) =>
+              `<div class="today-flip-card" id="fc-${i}-${d}">${ch}</div>`,
+          )
+          .join("");
+        html += `<div class="today-flip-unit">
+          <div class="today-flip-digits">${cards}</div>
+          <div class="today-flip-unit-label">${u.label}</div>
+        </div>`;
+        if (i < 3) html += `<div class="today-flip-sep">:</div>`;
+      });
+      html += `</div></div>`;
+      el.innerHTML = html;
+      el.dataset.prev = units.map((u) => u.val).join(",");
+      return;
+    }
+
+    // Subsequent renders — flip only changed digits
+    const prev = (el.dataset.prev || "").split(",");
+    units.forEach((u, i) => {
+      const oldVal = prev[i] || "";
+      u.val.split("").forEach((ch, d) => {
+        if (ch !== oldVal[d]) {
+          const card = document.getElementById(`fc-${i}-${d}`);
+          if (card) {
+            card.classList.remove("flipping");
+            void card.offsetWidth;
+            card.textContent = ch;
+            card.classList.add("flipping");
+          }
+        }
+      });
+    });
+    el.dataset.prev = units.map((u) => u.val).join(",");
+    el.dataset.prevDaysLen = String(currDaysLen);
+  }
+
+  _render();
+  flipClockInterval = setInterval(_render, 1000);
+}
+
+// ── TODAY TAB SITUATIONAL QUOTES ──
+const _TODAY_QUOTES = {
+  zero_days: [
+    {
+      text: "You don't have to be great to start, but you have to start to be great.",
+      author: "Zig Ziglar",
+    },
+    {
+      text: "The secret of getting ahead is getting started.",
+      author: "Mark Twain",
+    },
+    {
+      text: "A year from now you will wish you had started today.",
+      author: "Karen Lamb",
+    },
+    {
+      text: "The future depends on what you do today.",
+      author: "Mahatma Gandhi",
+    },
+    {
+      text: "Start where you are. Use what you have. Do what you can.",
+      author: "Arthur Ashe",
+    },
+    {
+      text: "You are never too old to set another goal or to dream a new dream.",
+      author: "C.S. Lewis",
+    },
+    {
+      text: "The pain of discipline is far less than the pain of regret.",
+      author: "Unknown",
+    },
+    {
+      text: "It always seems impossible until it's done.",
+      author: "Nelson Mandela",
+    },
+    {
+      text: "Small steps every day. That's how mountains are moved.",
+      author: "Unknown",
+    },
+    {
+      text: "Arise, awake, and stop not till the goal is reached.",
+      author: "Swami Vivekananda",
+    },
+    { text: "Dreams don't work unless you do.", author: "John C. Maxwell" },
+    {
+      text: "The best time to start was yesterday. The next best time is now.",
+      author: "Unknown",
+    },
+    {
+      text: "Even the longest journey begins with a single step — take yours today.",
+      author: "Lao Tzu",
+    },
+    {
+      text: "You have exactly the same number of hours in a day as everyone who ever achieved anything great.",
+      author: "Unknown",
+    },
+  ],
+  behind: [
+    {
+      text: "Our greatest weakness lies in giving up. The most certain way to succeed is always to try just one more time.",
+      author: "Thomas Edison",
+    },
+    {
+      text: "Strength does not come from physical capacity. It comes from an indomitable will.",
+      author: "Mahatma Gandhi",
+    },
+    {
+      text: "Be like water — not powerful because of force, but unstoppable because of persistence.",
+      author: "Bruce Lee",
+    },
+    {
+      text: "The man who moves a mountain begins by carrying away small stones.",
+      author: "Confucius",
+    },
+    {
+      text: "Hardships often prepare ordinary people for an extraordinary destiny.",
+      author: "C.S. Lewis",
+    },
+    {
+      text: "The harder the conflict, the greater the triumph.",
+      author: "George Washington",
+    },
+    {
+      text: "Perseverance is not a long race; it is many short races, one after another.",
+      author: "Walter Elliot",
+    },
+    {
+      text: "Energy and persistence conquer all things.",
+      author: "Benjamin Franklin",
+    },
+    {
+      text: "Every day you don't give up is a day you're still in the race.",
+      author: "Unknown",
+    },
+    {
+      text: "Being behind doesn't mean being out. It means you have more reason to move faster.",
+      author: "Unknown",
+    },
+    {
+      text: "The gap between where you are and where you need to be closes one chapter at a time.",
+      author: "Unknown",
+    },
+    {
+      text: "Character is not built in comfort — it's built in exactly moments like this one.",
+      author: "Unknown",
+    },
+    {
+      text: "You have survived every hard day so far. Today is just another one to get through.",
+      author: "Unknown",
+    },
+    {
+      text: "It is not the mountain we conquer, but ourselves.",
+      author: "Edmund Hillary",
+    },
+  ],
+  zone3: [
+    {
+      text: "When everything seems to be going against you, remember that the aeroplane takes off against the wind.",
+      author: "Henry Ford",
+    },
+    { text: "The only way out is through.", author: "Robert Frost" },
+    { text: "Pressure makes diamonds.", author: "George S. Patton" },
+    {
+      text: "Do not pray for an easy life — pray for the strength to endure a difficult one.",
+      author: "Bruce Lee",
+    },
+    {
+      text: "The darkest hour has only sixty minutes.",
+      author: "Morris Mandel",
+    },
+    {
+      text: "If you're going through hell, keep going.",
+      author: "Winston Churchill",
+    },
+    {
+      text: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+      author: "Winston Churchill",
+    },
+    {
+      text: "Take up one idea. Make that one idea your life — your every thought, every action.",
+      author: "Swami Vivekananda",
+    },
+    {
+      text: "Late is better than never. Moving is better than standing still.",
+      author: "Unknown",
+    },
+    {
+      text: "Every chapter you finish now is one less thing standing between you and that result.",
+      author: "Unknown",
+    },
+    {
+      text: "The situation is hard. You are harder. Prove it today.",
+      author: "Unknown",
+    },
+    {
+      text: "It's not about how much time you have left — it's about what you do with the time that remains.",
+      author: "Unknown",
+    },
+    {
+      text: "Panic wastes the very time you're running out of. Work instead.",
+      author: "Unknown",
+    },
+    {
+      text: "You don't need perfect conditions to do great work. You never did.",
+      author: "Unknown",
+    },
+  ],
+  recovery: [
+    { text: "Fall seven times, stand up eight.", author: "Japanese Proverb" },
+    {
+      text: "The greatest glory in living lies not in never falling, but in rising every time we fall.",
+      author: "Nelson Mandela",
+    },
+    {
+      text: "It's not whether you get knocked down — it's whether you get up.",
+      author: "Vince Lombardi",
+    },
+    {
+      text: "Rock bottom became the solid foundation on which I rebuilt my life.",
+      author: "J.K. Rowling",
+    },
+    {
+      text: "The comeback is always stronger than the setback.",
+      author: "Unknown",
+    },
+    {
+      text: "You may have to fight a battle more than once to win it.",
+      author: "Margaret Thatcher",
+    },
+    {
+      text: "Success is stumbling from failure to failure with no loss of enthusiasm.",
+      author: "Winston Churchill",
+    },
+    {
+      text: "Only those who dare to fail greatly can ever achieve greatly.",
+      author: "Robert F. Kennedy",
+    },
+    {
+      text: "You've already done the hardest thing — you started again.",
+      author: "Unknown",
+    },
+    {
+      text: "A setback is a setup for a comeback. You're in the setup phase — embrace it.",
+      author: "Unknown",
+    },
+    {
+      text: "The fact that you're back is the most important thing. Everything else follows from here.",
+      author: "Unknown",
+    },
+    {
+      text: "Resilience is not about bouncing back. It's about moving forward.",
+      author: "Unknown",
+    },
+    {
+      text: "Every expert was once a beginner who refused to quit.",
+      author: "Unknown",
+    },
+    {
+      text: "You didn't come this far only to come this far.",
+      author: "Unknown",
+    },
+  ],
+  streak: [
+    {
+      text: "We are what we repeatedly do. Excellence is not an act but a habit.",
+      author: "Aristotle",
+    },
+    {
+      text: "Consistency is the true foundation of trust — trust in yourself most of all.",
+      author: "Roy T. Bennett",
+    },
+    {
+      text: "Small daily improvements over time lead to stunning results.",
+      author: "Robin Sharma",
+    },
+    {
+      text: "Success is the sum of small efforts, repeated day in and day out.",
+      author: "Robert Collier",
+    },
+    {
+      text: "Motivation gets you going, but discipline keeps you growing.",
+      author: "John C. Maxwell",
+    },
+    {
+      text: "Long-term consistency trumps short-term intensity.",
+      author: "Bruce Lee",
+    },
+    {
+      text: "If you light a lamp for somebody, it will also brighten your path.",
+      author: "Gautama Buddha",
+    },
+    {
+      text: "The secret of your future is hidden in your daily routine.",
+      author: "Mike Murdock",
+    },
+    {
+      text: "You will never always be motivated. That's exactly why you built this habit.",
+      author: "Unknown",
+    },
+    {
+      text: "Champions keep playing until they get it right.",
+      author: "Billie Jean King",
+    },
+    {
+      text: "Every day you show up is a vote for the kind of student you want to become.",
+      author: "Unknown",
+    },
+    {
+      text: "The goal is not to be perfect — it's to be consistent. You are doing that.",
+      author: "Unknown",
+    },
+    {
+      text: "Streaks don't build themselves. You built this one, one day at a time.",
+      author: "Unknown",
+    },
+    {
+      text: "Where the mind is without fear and the head is held high — into that heaven of freedom, let me awake.",
+      author: "Rabindranath Tagore",
+    },
+  ],
+  on_track: [
+    {
+      text: "The only way to do great work is to love what you do.",
+      author: "Steve Jobs",
+    },
+    {
+      text: "An investment in knowledge pays the best interest.",
+      author: "Benjamin Franklin",
+    },
+    {
+      text: "Where there is righteousness in the heart, there is beauty in the character.",
+      author: "A.P.J. Abdul Kalam",
+    },
+    {
+      text: "The trees that are slow to grow bear the best fruit.",
+      author: "Molière",
+    },
+    {
+      text: "Believe you can and you're halfway there.",
+      author: "Theodore Roosevelt",
+    },
+    {
+      text: "Don't count the days — make the days count.",
+      author: "Muhammad Ali",
+    },
+    {
+      text: "What you get by achieving your goals is not as important as what you become.",
+      author: "Henry David Thoreau",
+    },
+    {
+      text: "You are braver than you believe, stronger than you seem, smarter than you think.",
+      author: "A.A. Milne",
+    },
+    {
+      text: "The difference between ordinary and extraordinary is that little extra.",
+      author: "Jimmy Johnson",
+    },
+    {
+      text: "Being on track is not luck. It's the result of every small decision you made correctly.",
+      author: "Unknown",
+    },
+    {
+      text: "Don't slow down because it's going well. That's exactly when most people do.",
+      author: "Unknown",
+    },
+    {
+      text: "Good things take time. You're putting in the time. Trust the process.",
+      author: "Unknown",
+    },
+    {
+      text: "The work you do today is building something you'll be grateful for on results day.",
+      author: "Unknown",
+    },
+    {
+      text: "You have a plan and you're executing it. That alone puts you ahead of most.",
+      author: "Unknown",
+    },
+  ],
+  revision_mode: [
+    {
+      text: "The roots of education are bitter, but the fruit is sweet.",
+      author: "Aristotle",
+    },
+    {
+      text: "Education is the most powerful weapon which you can use to change the world.",
+      author: "Nelson Mandela",
+    },
+    {
+      text: "Repetition is the mother of learning, the father of action, the architect of accomplishment.",
+      author: "Zig Ziglar",
+    },
+    {
+      text: "Live as if you were to die tomorrow. Learn as if you were to live forever.",
+      author: "Mahatma Gandhi",
+    },
+    {
+      text: "The beautiful thing about learning is that no one can take it away from you.",
+      author: "B.B. King",
+    },
+    {
+      text: "Tell me and I forget. Teach me and I remember. Involve me and I learn.",
+      author: "Benjamin Franklin",
+    },
+    {
+      text: "The capacity to learn is a gift; the ability to learn is a skill; the willingness to learn is a choice.",
+      author: "Brian Herbert",
+    },
+    {
+      text: "You've done the chapters. Now let revision do what it was always meant to — lock it in forever.",
+      author: "Unknown",
+    },
+    {
+      text: "Memory isn't built in one sitting. It's built in the revisits. You're doing exactly that.",
+      author: "Unknown",
+    },
+    {
+      text: "Revision is not repetition — it's refinement. Each time you go back, you understand more.",
+      author: "Unknown",
+    },
+    {
+      text: "The syllabus is done. The real work now is making sure it stays.",
+      author: "Unknown",
+    },
+    {
+      text: "What is learned in youth is carved in stone.",
+      author: "Arabic Proverb",
+    },
+    {
+      text: "Review what you know. Strengthen what you don't. That's how exams are won.",
+      author: "Unknown",
+    },
+    {
+      text: "You're in the final straight. Every revision session from here is a mark in the bank.",
+      author: "Unknown",
+    },
+  ],
+};
+
+function _getTodayQuote() {
+  if (!profile || !profile.examDate) return null;
+
+  const today = todayStr();
+
+  // Return stored quote if already picked today — same quote all day, survives tab changes and reopen
+  try {
+    const stored = JSON.parse(localStorage.getItem("st_daily_quote"));
+    if (stored && stored.date === today) {
+      return { text: stored.text, author: stored.author };
+    }
+  } catch (e) {}
+
+  // First call today — pick based on current state
+  const ps = _computePaceState();
+  const syllabusChaps = chapters.filter((c) => !c.isCustom);
+  const completed = syllabusChaps.filter(
+    (c) => c.status === "Completed",
+  ).length;
+  const total = _syllabusGrandTotal() || syllabusChaps.length;
+  const remaining = total - completed;
+
+  let studiedDaysThisWeek = 0;
+  for (let d = 0; d < 7; d++) {
+    if (weeklyLog[addDays(today, -d)] > 0) studiedDaysThisWeek++;
+  }
+
+  const streakCount = streak ? streak.count : 0;
+
+  // Exam day — one specific quote, shown regardless of other state
+  const daysToExam = profile.examDate
+    ? Math.round(
+        (dateKeyToUTC(profile.examDate) - dateKeyToUTC(today)) / 86400000,
+      )
+    : null;
+  if (daysToExam === 0) {
+    return {
+      text: "You are more prepared than you feel, more capable than you think, and closer than you realise.",
+      author: "Unknown",
+    };
+  }
+
+  let pool = null;
+  if (studiedDaysThisWeek === 0) pool = _TODAY_QUOTES.zero_days;
+  else if (ps && ps.isEmergency) pool = _TODAY_QUOTES.zone3;
+  else if (ps && ps.paceRecovering) pool = _TODAY_QUOTES.recovery;
+  else if (
+    ps &&
+    !ps.onTrackForSafe &&
+    !ps.inRevisionWindow &&
+    ps.studyDaysCount >= 2
+  )
+    pool = _TODAY_QUOTES.behind;
+  else if (remaining === 0 && total > 0) pool = _TODAY_QUOTES.revision_mode;
+  else if (streakCount >= 7) pool = _TODAY_QUOTES.streak;
+  else if (ps && ps.onTrackForSafe) pool = _TODAY_QUOTES.on_track;
+  if (!pool && studiedDaysThisWeek > 0) pool = _TODAY_QUOTES.on_track;
+
+  if (!pool) return null;
+
+  // Date-seeded pick — deterministic, same result if called again today before storage is set
+  const seed = parseInt(today.replace(/-/g, "")) % pool.length;
+  const q = pool[seed];
+
+  // Lock in for the rest of the day
+  try {
+    localStorage.setItem(
+      "st_daily_quote",
+      JSON.stringify({
+        date: today,
+        text: q.text,
+        author: q.author,
+      }),
+    );
+  } catch (e) {}
+
+  return q;
+}
+
+function _renderTodayQuote() {
+  const el = document.getElementById("today-quote");
+  if (!el) return;
+  const q = _getTodayQuote();
+  if (!q) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = `<div class="today-quote-wrap">
+    <div class="today-quote-text">"${q.text}"</div>
+    <div class="today-quote-author">— ${q.author}</div>
+  </div>`;
+}
+
 // ── PROCESS MISSED REVISIONS ON APP OPEN ──
 function processMissedRevisions() {
   const t = todayStr();
@@ -819,7 +1589,7 @@ function logTodayActivity() {
   const t = todayStr();
   const revsDone = revisions.filter((r) => r.dueDate === t && r.done).length;
   const chapsDoneToday = chapters.filter(
-    (c) => c.status === "Completed" && (c.completedDate || c.dateAdded) === t
+    (c) => c.status === "Completed" && (c.completedDate || c.dateAdded) === t,
   ).length;
   weeklyLog[t] = revsDone + (chapsDoneToday > 0 ? 1 : 0);
   save();
@@ -856,6 +1626,10 @@ function switchTab(e, name) {
     clearInterval(graceTimerInterval);
     graceTimerInterval = null;
   }
+  if (name !== "today" && flipClockInterval) {
+    clearInterval(flipClockInterval);
+    flipClockInterval = null;
+  }
   document
     .querySelectorAll(".tab-content")
     .forEach((t) => t.classList.remove("active"));
@@ -864,9 +1638,8 @@ function switchTab(e, name) {
     .forEach((b) => b.classList.remove("active"));
   document.getElementById("tab-" + name).classList.add("active");
   e.currentTarget.classList.add("active");
-  if (name === "group") {
-    renderGroup();
-  }
+  if (name === "today") renderTodayRevisions();
+  if (name === "group") renderGroup();
   if (name === "weak") renderWeak();
   if (name === "chapters") renderSubjectGrid();
   if (name === "progress") renderProgress();
@@ -1212,6 +1985,8 @@ function setFilter(f) {
 
 // ── RENDER TODAY ──
 function renderTodayRevisions() {
+  renderFlipClock();
+  _renderTodayQuote();
   const grid = document.getElementById("todayGrid");
   const t = todayStr();
   const yesterday = addDays(t, -1);
@@ -2272,67 +3047,147 @@ function _computePaceState() {
   const syllabusChaps = chapters.filter((c) => !c.isCustom);
   const total = _syllabusGrandTotal() || syllabusChaps.length;
   if (total === 0) return null;
-  const completed = syllabusChaps.filter((c) => c.status === "Completed").length;
+  const completed = syllabusChaps.filter(
+    (c) => c.status === "Completed",
+  ).length;
   const remaining = total - completed;
   const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const examDate = profile.examDate;
-  const daysToExam = Math.max(0, Math.round((dateKeyToUTC(examDate) - dateKeyToUTC(today)) / 86400000));
-  const safeFinishDate = addDays(examDate, -30);
-  const safeDaysLeft = Math.max(0, Math.round((dateKeyToUTC(safeFinishDate) - dateKeyToUTC(today)) / 86400000));
+  const daysToExam = Math.max(
+    0,
+    Math.round((dateKeyToUTC(examDate) - dateKeyToUTC(today)) / 86400000),
+  );
+  const safeFinishDate =
+    profile && profile.deadline ? profile.deadline : addDays(examDate, -15);
+  const safeDaysLeft = Math.max(
+    0,
+    Math.round((dateKeyToUTC(safeFinishDate) - dateKeyToUTC(today)) / 86400000),
+  );
   const inSilentZone = daysToExam <= 5;
   const inRevisionWindow = safeDaysLeft === 0 && !inSilentZone;
-  const isEmergency = inRevisionWindow && completionPct < 25 && remaining > 0;
-  const nearZoneDrop = !inRevisionWindow && safeDaysLeft <= 20 && safeDaysLeft > 15;
+  const isEmergency = inRevisionWindow && completionPct < 50 && remaining > 0;
+  const nearZoneDrop =
+    !inRevisionWindow && safeDaysLeft <= 20 && safeDaysLeft > 15;
   const activeDays = new Set(
-    revisions.filter((r) => r.done && r.completedOn && r.dayOffset === 1).map((r) => r.completedOn)
+    revisions
+      .filter((r) => r.done && r.completedOn && r.dayOffset === 1)
+      .map((r) => r.completedOn),
   );
   const fallbackDays = new Set(
-    syllabusChaps.filter((c) => c.status === "Completed" && c.dateAdded).map((c) => c.dateAdded)
+    syllabusChaps
+      .filter((c) => c.status === "Completed" && c.dateAdded)
+      .map((c) => c.dateAdded),
   );
-  const studyDaysCount = activeDays.size > 0 ? activeDays.size : fallbackDays.size;
+  const studyDaysCount =
+    activeDays.size > 0 ? activeDays.size : fallbackDays.size;
   const rawPace = studyDaysCount > 0 ? completed / studyDaysCount : 0;
-  // Cap bulk-entry inflation: if all completed chapters share one dateAdded and no R1s exist yet,
-  // treat it as a data-entry session and spread over a conservative 30-day baseline
-  const currentPace = (activeDays.size === 0 && fallbackDays.size === 1 && completed > 5)
-    ? completed / 30
-    : rawPace;
-  let last7completed = 0, prev7completed = 0;
+  // Elapsed days since profile was created — penalises idle time correctly
+  const daysSinceStart = profile.dateCreated
+    ? Math.max(
+        1,
+        Math.round(
+          (dateKeyToUTC(today) - dateKeyToUTC(profile.dateCreated)) / 86400000,
+        ),
+      )
+    : null;
+  // Cap: bulk-entry (>5 chapters, 1 day) OR single-session inflation vs actual elapsed time
+  const currentPace =
+    activeDays.size === 0 && fallbackDays.size === 1 && completed > 5
+      ? completed / 30
+      : daysSinceStart && rawPace > completed / daysSinceStart
+        ? completed / daysSinceStart
+        : rawPace;
+  let last7completed = 0,
+    prev7completed = 0;
   for (let d = 0; d < 7; d++)
-    last7completed += syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) === addDays(today, -d)).length;
+    last7completed += syllabusChaps.filter(
+      (c) =>
+        c.status === "Completed" &&
+        (c.completedDate || c.dateAdded) === addDays(today, -d),
+    ).length;
   for (let d = 7; d < 14; d++)
-    prev7completed += syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) === addDays(today, -d)).length;
+    prev7completed += syllabusChaps.filter(
+      (c) =>
+        c.status === "Completed" &&
+        (c.completedDate || c.dateAdded) === addDays(today, -d),
+    ).length;
   const last7studyDays = new Set(
-    syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) &&
-      dateKeyToUTC(c.completedDate || c.dateAdded) >= dateKeyToUTC(addDays(today, -6))).map((c) => c.completedDate || c.dateAdded)
+    syllabusChaps
+      .filter(
+        (c) =>
+          c.status === "Completed" &&
+          (c.completedDate || c.dateAdded) &&
+          dateKeyToUTC(c.completedDate || c.dateAdded) >=
+            dateKeyToUTC(addDays(today, -6)),
+      )
+      .map((c) => c.completedDate || c.dateAdded),
   ).size;
   const prev7studyDays = new Set(
-    syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) &&
-      dateKeyToUTC(c.completedDate || c.dateAdded) >= dateKeyToUTC(addDays(today, -13)) &&
-      dateKeyToUTC(c.completedDate || c.dateAdded) < dateKeyToUTC(addDays(today, -6))).map((c) => c.completedDate || c.dateAdded)
+    syllabusChaps
+      .filter(
+        (c) =>
+          c.status === "Completed" &&
+          (c.completedDate || c.dateAdded) &&
+          dateKeyToUTC(c.completedDate || c.dateAdded) >=
+            dateKeyToUTC(addDays(today, -13)) &&
+          dateKeyToUTC(c.completedDate || c.dateAdded) <
+            dateKeyToUTC(addDays(today, -6)),
+      )
+      .map((c) => c.completedDate || c.dateAdded),
   ).size;
   const last7pace = last7studyDays > 0 ? last7completed / last7studyDays : 0;
   const prev7pace = prev7studyDays > 0 ? prev7completed / prev7studyDays : 0;
-  const paceImproving  = last7pace > prev7pace + 0.3 && last7completed >= 2;
-  const paceSlipping   = prev7pace > last7pace + 0.3 && prev7completed >= 2;
-  const paceRecovering = paceImproving && prev7completed === 0 && last7completed >= 2;
-  const effectivePace  = (paceImproving && last7pace > currentPace) ? last7pace
-                        : (paceSlipping && last7pace < currentPace) ? last7pace
-                        : currentPace;
+  const paceImproving = last7pace > prev7pace + 0.3 && last7completed >= 2;
+  const paceSlipping = prev7pace > last7pace + 0.3 && prev7completed >= 2;
+  const paceRecovering =
+    paceImproving &&
+    prev7completed === 0 &&
+    last7completed >= 2 &&
+    studyDaysCount > 1;
+  const effectivePace =
+    paceImproving && last7pace > currentPace
+      ? last7pace
+      : paceSlipping && last7pace < currentPace
+        ? last7pace
+        : currentPace;
   const paceNeededForSafe = safeDaysLeft > 0 ? remaining / safeDaysLeft : null;
-  const onTrackForSafe = paceNeededForSafe !== null && effectivePace >= paceNeededForSafe * 0.9;
-  const projectedFinish = effectivePace > 0 && remaining > 0
-    ? addDays(today, Math.ceil(remaining / effectivePace))
-    : (remaining === 0 ? today : null);
-  const projBeforeSafe = projectedFinish
-    ? dateKeyToUTC(projectedFinish) <= dateKeyToUTC(safeFinishDate)
-    : null;
+  const onTrackForSafe =
+    paceNeededForSafe !== null && effectivePace >= paceNeededForSafe * 0.9;
+  const projectedFinish =
+    effectivePace > 0 && remaining > 0
+      ? addDays(today, Math.ceil(remaining / effectivePace))
+      : remaining === 0
+        ? today
+        : null;
+  const projBeforeSafe = onTrackForSafe ?? null;
   return {
-    today, completed, total, remaining, completionPct, examDate,
-    daysToExam, safeFinishDate, safeDaysLeft,
-    inSilentZone, inRevisionWindow, isEmergency, nearZoneDrop,
-    currentPace, effectivePace, last7pace, prev7pace, last7completed, prev7completed,
-    paceImproving, paceSlipping, paceRecovering,
-    paceNeededForSafe, onTrackForSafe, projectedFinish, projBeforeSafe,
+    today,
+    completed,
+    total,
+    remaining,
+    completionPct,
+    examDate,
+    daysToExam,
+    safeFinishDate,
+    safeDaysLeft,
+    inSilentZone,
+    inRevisionWindow,
+    isEmergency,
+    nearZoneDrop,
+    currentPace,
+    effectivePace,
+    last7pace,
+    prev7pace,
+    last7completed,
+    prev7completed,
+    paceImproving,
+    paceSlipping,
+    paceRecovering,
+    paceNeededForSafe,
+    onTrackForSafe,
+    projectedFinish,
+    projBeforeSafe,
+    studyDaysCount,
   };
 }
 
@@ -2354,12 +3209,17 @@ function renderCoachTab() {
   // ── Snapshot key — only re-render when something meaningful changed ──
   const today = todayStr();
   const syllabusChaps = chapters.filter((c) => !c.isCustom);
-  const completed = syllabusChaps.filter((c) => c.status === "Completed").length;
+  const completed = syllabusChaps.filter(
+    (c) => c.status === "Completed",
+  ).length;
   const totalRevDone = revisions.filter((r) => r.done).length;
   const _snapActiveDays = new Set(
-    revisions.filter((r) => r.done && r.completedOn && r.dayOffset === 1).map((r) => r.completedOn)
+    revisions
+      .filter((r) => r.done && r.completedOn && r.dayOffset === 1)
+      .map((r) => r.completedOn),
   ).size;
   const _snapWeakCount = chapters.filter((c) => c.isWeak).length;
+  const _snapMissedPerm = revisions.filter((r) => r.missedPermanently).length;
   const snap = [
     today,
     completed,
@@ -2374,6 +3234,8 @@ function renderCoachTab() {
     streak ? streak.count : 0,
     coins,
     _snapWeakCount,
+    _snapMissedPerm,
+    profile ? (profile.setupSeen ? "1" : "0") : "0",
   ].join("|");
   if (block.dataset.snap === snap) return;
   block.dataset.snap = snap;
@@ -2389,85 +3251,157 @@ function renderCoachTab() {
 
   // ── Timeline ──
   const daysToExam = examDate
-    ? Math.max(0, Math.round((dateKeyToUTC(examDate) - dateKeyToUTC(today)) / 86400000))
+    ? Math.max(
+        0,
+        Math.round((dateKeyToUTC(examDate) - dateKeyToUTC(today)) / 86400000),
+      )
     : null;
-  const safeFinishDate = examDate ? addDays(examDate, -30) : null;
+  const safeFinishDate = examDate
+    ? profile && profile.deadline
+      ? profile.deadline
+      : addDays(examDate, -15)
+    : null;
   const safeDaysLeft = safeFinishDate
-    ? Math.max(0, Math.round((dateKeyToUTC(safeFinishDate) - dateKeyToUTC(today)) / 86400000))
+    ? Math.max(
+        0,
+        Math.round(
+          (dateKeyToUTC(safeFinishDate) - dateKeyToUTC(today)) / 86400000,
+        ),
+      )
     : null;
   const inSilentZone = daysToExam !== null && daysToExam <= 5;
-  const inRevisionWindow = safeDaysLeft !== null && safeDaysLeft === 0 && !inSilentZone;
+  const inRevisionWindow =
+    safeDaysLeft !== null && safeDaysLeft === 0 && !inSilentZone;
 
   // ── Pace ──
   const activeDays = new Set(
-    revisions.filter((r) => r.done && r.completedOn && r.dayOffset === 1).map((r) => r.completedOn)
+    revisions
+      .filter((r) => r.done && r.completedOn && r.dayOffset === 1)
+      .map((r) => r.completedOn),
   );
   const fallbackDays = new Set(
-    syllabusChaps.filter((c) => c.status === "Completed" && c.dateAdded).map((c) => c.dateAdded)
+    syllabusChaps
+      .filter((c) => c.status === "Completed" && c.dateAdded)
+      .map((c) => c.dateAdded),
   );
-  const studyDaysCount = activeDays.size > 0 ? activeDays.size : fallbackDays.size;
+  const studyDaysCount =
+    activeDays.size > 0 ? activeDays.size : fallbackDays.size;
   const rawPace = studyDaysCount > 0 ? completed / studyDaysCount : 0;
-  const currentPace = (activeDays.size === 0 && fallbackDays.size === 1 && completed > 5)
-    ? completed / 30
-    : rawPace;
+  const daysSinceStart =
+    profile && profile.dateCreated
+      ? Math.max(
+          1,
+          Math.round(
+            (dateKeyToUTC(today) - dateKeyToUTC(profile.dateCreated)) /
+              86400000,
+          ),
+        )
+      : null;
+  const currentPace =
+    activeDays.size === 0 && fallbackDays.size === 1 && completed > 5
+      ? completed / 30
+      : daysSinceStart && rawPace > completed / daysSinceStart
+        ? completed / daysSinceStart
+        : rawPace;
 
   // ── Trend: last 7 days vs previous 7 days ──
-  let last7completed = 0, prev7completed = 0;
+  let last7completed = 0,
+    prev7completed = 0;
   for (let d = 0; d < 7; d++) {
-    last7completed += syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) === addDays(today, -d)).length;
+    last7completed += syllabusChaps.filter(
+      (c) =>
+        c.status === "Completed" &&
+        (c.completedDate || c.dateAdded) === addDays(today, -d),
+    ).length;
   }
   for (let d = 7; d < 14; d++) {
-    prev7completed += syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) === addDays(today, -d)).length;
+    prev7completed += syllabusChaps.filter(
+      (c) =>
+        c.status === "Completed" &&
+        (c.completedDate || c.dateAdded) === addDays(today, -d),
+    ).length;
   }
   // Divide by actual study days in each window, not calendar days
   // e.g. 4 chapters on 4 days = 1.0/day, not 4/7 = 0.57
   const last7studyDays = new Set(
-    syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) &&
-      dateKeyToUTC(c.completedDate || c.dateAdded) >= dateKeyToUTC(addDays(today, -6)))
-    .map((c) => c.completedDate || c.dateAdded)
+    syllabusChaps
+      .filter(
+        (c) =>
+          c.status === "Completed" &&
+          (c.completedDate || c.dateAdded) &&
+          dateKeyToUTC(c.completedDate || c.dateAdded) >=
+            dateKeyToUTC(addDays(today, -6)),
+      )
+      .map((c) => c.completedDate || c.dateAdded),
   ).size;
   const prev7studyDays = new Set(
-    syllabusChaps.filter((c) => c.status === "Completed" && (c.completedDate || c.dateAdded) &&
-      dateKeyToUTC(c.completedDate || c.dateAdded) >= dateKeyToUTC(addDays(today, -13)) &&
-      dateKeyToUTC(c.completedDate || c.dateAdded) < dateKeyToUTC(addDays(today, -6)))
-    .map((c) => c.completedDate || c.dateAdded)
+    syllabusChaps
+      .filter(
+        (c) =>
+          c.status === "Completed" &&
+          (c.completedDate || c.dateAdded) &&
+          dateKeyToUTC(c.completedDate || c.dateAdded) >=
+            dateKeyToUTC(addDays(today, -13)) &&
+          dateKeyToUTC(c.completedDate || c.dateAdded) <
+            dateKeyToUTC(addDays(today, -6)),
+      )
+      .map((c) => c.completedDate || c.dateAdded),
   ).size;
   const last7pace = last7studyDays > 0 ? last7completed / last7studyDays : 0;
   const prev7pace = prev7studyDays > 0 ? prev7completed / prev7studyDays : 0;
-  const paceImproving  = last7pace > prev7pace + 0.3 && last7completed >= 2;
-  const paceSlipping   = prev7pace > last7pace + 0.3 && prev7completed >= 2;
-  const paceRecovering = paceImproving && prev7completed === 0 && last7completed >= 2;
+  const paceImproving = last7pace > prev7pace + 0.3 && last7completed >= 2;
+  const paceSlipping = prev7pace > last7pace + 0.3 && prev7completed >= 2;
+  const paceRecovering =
+    paceImproving &&
+    prev7completed === 0 &&
+    last7completed >= 2 &&
+    studyDaysCount > 1;
 
   // ── Use recent pace only if it's actually higher than all-time pace ──
   // Prevents a good recent week from replacing a better all-time average
-  const effectivePace = (paceImproving && last7pace > currentPace) ? last7pace
-                      : (paceSlipping  && last7pace < currentPace) ? last7pace
-                      : currentPace;
+  const effectivePace =
+    paceImproving && last7pace > currentPace
+      ? last7pace
+      : paceSlipping && last7pace < currentPace
+        ? last7pace
+        : currentPace;
 
-  const projectedFinish = effectivePace > 0 && remaining > 0
-    ? addDays(today, Math.ceil(remaining / effectivePace))
-    : (remaining === 0 ? today : null);
-  const projBeforeSafe = projectedFinish && safeFinishDate
-    ? dateKeyToUTC(projectedFinish) <= dateKeyToUTC(safeFinishDate)
-    : null;
+  const projectedFinish =
+    effectivePace > 0 && remaining > 0
+      ? addDays(today, Math.ceil(remaining / effectivePace))
+      : remaining === 0
+        ? today
+        : null;
   const paceNeededForSafe = safeDaysLeft > 0 ? remaining / safeDaysLeft : null;
-  const onTrackForSafe = paceNeededForSafe !== null && effectivePace >= paceNeededForSafe * 0.9;
+  const onTrackForSafe =
+    paceNeededForSafe !== null && effectivePace >= paceNeededForSafe * 0.9;
+  const projBeforeSafe = onTrackForSafe ?? null;
 
   // ── Emergency mode ──
-  const isEmergency = inRevisionWindow && completionPct < 25 && remaining > 0;
+  const isEmergency = inRevisionWindow && completionPct < 50 && remaining > 0;
   const paceNeededForExam = daysToExam > 0 ? remaining / daysToExam : null;
 
   // ── Zone boundary warning ──
-  const nearZoneDrop = !inRevisionWindow && safeDaysLeft !== null && safeDaysLeft <= 20 && safeDaysLeft > 15;
+  const nearZoneDrop =
+    !inRevisionWindow &&
+    safeDaysLeft !== null &&
+    safeDaysLeft <= 20 &&
+    safeDaysLeft > 15;
 
   // ── Zone ──
-  const zone = !examDate ? 0
-    : inSilentZone ? 4
-    : isEmergency ? 5
-    : inRevisionWindow ? 3
-    : safeDaysLeft > 45 ? 1
-    : safeDaysLeft > 15 ? 2
-    : 3;
+  const zone = !examDate
+    ? 0
+    : inSilentZone
+      ? 4
+      : isEmergency
+        ? 5
+        : inRevisionWindow
+          ? 3
+          : safeDaysLeft > 45
+            ? 1
+            : safeDaysLeft > 15
+              ? 2
+              : 3;
 
   // ── Chapters at risk of losing R4 ──
   // Use actual R4 dueDate from revisions array — dateAdded is restored to original add date
@@ -2475,20 +3409,32 @@ function renderCoachTab() {
   const chapsLosingR4 = examDate
     ? syllabusChaps.filter((c) => {
         if (c.status !== "Completed") return false;
-        const r4 = revisions.find((r) => r.chapterId === c.id && r.dayOffset === 30);
+        const r4 = revisions.find(
+          (r) => r.chapterId === c.id && r.dayOffset === 30,
+        );
         if (r4) return dateKeyToUTC(examDate) < dateKeyToUTC(r4.dueDate);
         // Fallback for chapters without R4 scheduled: use dateAdded + 30
-        return c.dateAdded && Math.round((dateKeyToUTC(examDate) - dateKeyToUTC(addDays(c.dateAdded, 30))) / 86400000) < 0;
+        return (
+          c.dateAdded &&
+          Math.round(
+            (dateKeyToUTC(examDate) - dateKeyToUTC(addDays(c.dateAdded, 30))) /
+              86400000,
+          ) < 0
+        );
       }).length
     : 0;
 
   // ── Weak chapters ──
   const weakCount = chapters.filter((c) => c.isWeak).length;
-  const autoWeakCount = chapters.filter((c) => c.isWeak && c._autoFlagged).length;
+  const autoWeakCount = chapters.filter(
+    (c) => c.isWeak && c._autoFlagged,
+  ).length;
   const missedPermCount = revisions.filter((r) => r.missedPermanently).length;
 
   // ── Today's revisions ──
-  const todayRevsDue = revisions.filter((r) => r.dueDate === today && !r.done && !r.missedPermanently).length;
+  const todayRevsDue = revisions.filter(
+    (r) => r.dueDate === today && !r.done && !r.missedPermanently,
+  ).length;
 
   // ── Weekly activity ──
   let studiedDaysThisWeek = 0;
@@ -2503,55 +3449,81 @@ function renderCoachTab() {
     if (!subjectMap[c.subject]) subjectMap[c.subject] = [];
     subjectMap[c.subject].push(c);
   });
-  let mostNeglectedSubj = null;
-  let mostNeglectedDays = 0;
-  Object.keys(subjectMap).forEach((subj) => {
-    const chs = subjectMap[subj];
-    const revDates = revisions
-      .filter((r) => r.done && r.completedOn && chs.find((c) => c.id === r.chapterId))
-      .map((r) => r.completedOn).sort().reverse();
-    const addedDates = chs.map((c) => c.completedDate || c.dateAdded).filter(Boolean).sort().reverse();
-    const lastDate = revDates[0] || addedDates[0];
-    if (!lastDate) return;
-    const daysSince = Math.round((dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000);
-    if (daysSince > mostNeglectedDays) { mostNeglectedDays = daysSince; mostNeglectedSubj = subj; }
-  });
-
-  // ── Syllabus coverage per subject (what coach knows) ──
-  const subjProgress = {};
-  Object.keys(subjectMap).forEach((subj) => {
-    const chs = subjectMap[subj];
-    const syllTotal = _syllabusTotal(subj) || chs.length;
-    const done = chs.filter((c) => c.status === "Completed").length;
-    subjProgress[subj] = { added: chs.length, done, total: syllTotal, pct: syllTotal > 0 ? Math.round((done / syllTotal) * 100) : 0 };
-  });
+  // Build full subject list from syllabus so untouched subjects are visible to Coach
+  const _cToLoad = [
+    "english_lang",
+    "english_lit",
+    "history",
+    "civics",
+    "geography",
+    "maths",
+  ];
+  const _cStream = profile ? profile.stream || "science" : "science";
+  if (_cStream === "science") _cToLoad.push("physics", "chemistry", "biology");
+  else _cToLoad.push("commerce", "economics_g2");
+  _cToLoad.push(
+    profile ? profile.lang2 || "hindi" : "hindi",
+    profile ? profile.elective || "computer" : "computer",
+  );
+  const _cMerge = { History: "History & Civics", Civics: "History & Civics" };
+  const _cSeen = new Set();
+  const _allSubjects = [];
+  if (window._syllabus) {
+    Object.values(window._syllabus.groups).forEach((group) => {
+      Object.entries(group.subjects).forEach(([key, subj]) => {
+        if (!_cToLoad.includes(key) || subj.chapters.length === 0) return;
+        const dn = _cMerge[subj.name] || subj.name;
+        if (!_cSeen.has(dn)) {
+          _cSeen.add(dn);
+          _allSubjects.push(dn);
+        }
+      });
+    });
+  } else {
+    Object.keys(subjectMap).forEach((s) => _allSubjects.push(s));
+  }
 
   // ── Group context ──
-  const inGroup = !!(groupCode);
+  const inGroup = !!groupCode;
 
   // ── Suggested deadline (personalised) ──
-  const suggestedDeadline = examDate
-    ? (effectivePace > 0
-        ? (() => {
-            const daysToFinish = Math.ceil(remaining / effectivePace);
-            const projDate = addDays(today, daysToFinish);
-            const daysBeforeIdeal = Math.round((dateKeyToUTC(addDays(examDate, -35)) - dateKeyToUTC(projDate)) / 86400000);
-            if (daysBeforeIdeal >= 0) return addDays(examDate, -35);
-            if (dateKeyToUTC(projDate) <= dateKeyToUTC(addDays(examDate, -7))) return addDays(examDate, -30);
-            return addDays(examDate, -7);
-          })()
-        : addDays(examDate, -35))
-    : null;
+  // ── Suggested deadline — dynamic, recalculates every render until student sets their own ──
+  // Projects actual finish at current pace + 5-day buffer, clamped to exam-60…exam-10.
+  // No pace yet (just started) → exam-35 fallback (preserves full revision cycle).
+  const suggestedDeadline = (() => {
+    if (!examDate) return null;
+    if (daysToExam < 15) return null;
+    // No suggestion once inside revision window — deadline concept is meaningless
+    if (inRevisionWindow) return null;
+    // No pace data yet — can't personalize, show nothing
+    if (effectivePace <= 0 || remaining === 0) return null;
+    const _sdMin = addDays(examDate, -60);
+    const _sdMax = addDays(examDate, -10);
+    const daysToFinish = Math.ceil(remaining / effectivePace);
+    // Personalized buffer: slipping students get more slack, improving students less
+    const _buffer = paceSlipping ? 10 : paceImproving ? 3 : 5;
+    const suggested = addDays(today, daysToFinish + _buffer);
+    // If projection overshoots _sdMax the student can't hit any valid deadline — don't suggest
+    if (dateKeyToUTC(suggested) > dateKeyToUTC(_sdMax)) return null;
+    if (dateKeyToUTC(suggested) < dateKeyToUTC(_sdMin)) return _sdMin;
+    return suggested;
+  })();
 
   // ── Pick helper ──
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
 
   // ── Day-of-week & streak tier ──
   const dow = new Date().getDay(); // 0=Sun,1=Mon,...,6=Sat
-  const isMon = dow === 1, isFri = dow === 5, isSat = dow === 6, isSun = dow === 0;
+  const isMon = dow === 1,
+    isFri = dow === 5,
+    isSat = dow === 6,
+    isSun = dow === 0;
   const isWeekend = isSat || isSun;
   // Streak tiers: 0=day1/none, 1=days2-6, 2=days7-20, 3=day21+
-  const streakTier = streakCount >= 21 ? 3 : streakCount >= 7 ? 2 : streakCount >= 2 ? 1 : 0;
+  const streakTier =
+    streakCount >= 21 ? 3 : streakCount >= 7 ? 2 : streakCount >= 2 ? 1 : 0;
 
   // ════════════════════════════════════════
   // BUILD VOICE — paragraphs + crisp lines
@@ -2561,34 +3533,43 @@ function renderCoachTab() {
   // ── POST-EXAM: exam date has passed ──
   if (daysToExam !== null && daysToExam <= 0) {
     const rawDiff = examDate
-      ? Math.round((dateKeyToUTC(todayStr()) - dateKeyToUTC(examDate)) / 86400000)
+      ? Math.round(
+          (dateKeyToUTC(todayStr()) - dateKeyToUTC(examDate)) / 86400000,
+        )
       : 0;
-    paras.push(`Your exam ${rawDiff === 0 ? "is today" : `was ${rawDiff} day${rawDiff !== 1 ? "s" : ""} ago`}. Hope it went well — you put in the work.`);
+    paras.push(
+      `Your exam ${rawDiff === 0 ? "is today" : `was ${rawDiff} day${rawDiff !== 1 ? "s" : ""} ago`}. Hope it went well — you put in the work.`,
+    );
     block.innerHTML = `
       <div style="background:linear-gradient(135deg,rgba(194,118,42,0.07),rgba(168,94,26,0.03));border:1px solid rgba(194,118,42,0.18);border-top:3px solid var(--indigo2);border-radius:16px;padding:20px 18px;box-shadow:0 4px 24px rgba(0,0,0,0.4)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(194,118,42,0.12)">
           <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--indigo2),var(--kumkum));display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;box-shadow:0 0 12px rgba(194,118,42,0.3)">🎓</div>
           <div>
             <div style="font-size:0.78rem;font-weight:700;color:var(--indigo);font-family:${_PC.font};letter-spacing:0.04em">COACH</div>
-            <div style="font-size:0.62rem;color:var(--text3);font-family:${_PC.font}">${name ? name + "'s" : "Your"} personalised assessment</div>
+            <div style="font-size:0.72rem;color:var(--text2);font-family:${_PC.font}">${name ? name + "'s" : "Your"} personalised assessment</div>
           </div>
         </div>
-        ${paras.map(p => `<p style="font-size:1.02rem;color:${_PC.text};line-height:1.85;font-family:${_PC.font};font-style:italic;margin:0">${p}</p>`).join("")}
+        ${paras.map((p) => `<p style="font-size:1.02rem;color:${_PC.text};line-height:1.85;font-family:${_PC.font};font-style:italic;margin:0">${p}</p>`).join("")}
       </div>`;
     return;
   }
 
   // ── SILENT ZONE: last 5 days ──
   if (inSilentZone) {
-    const lines = [
-      `${name ? name + ", " : ""}exam in ${daysToExam} day${daysToExam !== 1 ? "s" : ""}. You've done the work — trust it now.`,
-      `${daysToExam} day${daysToExam !== 1 ? "s" : ""} left, ${name || ""}. Close the books on things you don't know yet. Revise what you do.`,
-      `${name ? name + " — " : ""}this is it. ${daysToExam} day${daysToExam !== 1 ? "s" : ""} left. Rest well, eat well, show up sharp.`,
-      `${name ? name + ", " : ""}${daysToExam} day${daysToExam !== 1 ? "s" : ""} to go. No new chapters. Only what you know — sharper, tighter, ready.`,
-      `${daysToExam} day${daysToExam !== 1 ? "s" : ""}. The preparation is done, ${name || ""}. Now it's about showing up calm and sharp.`,
-      `${name ? name + " — " : ""}final stretch. ${daysToExam} day${daysToExam !== 1 ? "s" : ""} left. Sleep matters as much as revision now. Don't grind yourself hollow.`,
-      `${name ? name + ", " : ""}you're here. ${daysToExam} day${daysToExam !== 1 ? "s" : ""} out. Stick to what you know, revise steadily, and trust the months of work you've put in.`,
-    ];
+    const lines =
+      remaining > 0
+        ? [
+            `${name ? name + ", " : ""}${daysToExam} day${daysToExam !== 1 ? "s" : ""} left and ${remaining} chapter${remaining !== 1 ? "s" : ""} still to go. Don't stop — finish what you can and revise everything you've done. Every completed chapter still earns at least one revision before exam day.`,
+            `${name ? name + " — " : ""}${daysToExam} day${daysToExam !== 1 ? "s" : ""} to exam. You have ${remaining} chapter${remaining !== 1 ? "s" : ""} remaining. Keep going — complete what's reachable, revise what's done. That's the best use of every hour left.`,
+            `${name ? name + ", " : ""}${remaining} chapter${remaining !== 1 ? "s" : ""} unfinished with ${daysToExam} day${daysToExam !== 1 ? "s" : ""} to go. Work through as many as you can — and revise everything you've already completed in parallel.`,
+          ]
+        : [
+            `${name ? name + ", " : ""}exam in ${daysToExam} day${daysToExam !== 1 ? "s" : ""}. Syllabus is done — trust the work you've put in. Revise steadily and show up sharp.`,
+            `${daysToExam} day${daysToExam !== 1 ? "s" : ""} left, ${name || ""}. You've covered the syllabus. Now it's about recall and sharpness — revise, rest, and go in clear.`,
+            `${name ? name + " — " : ""}this is it. ${daysToExam} day${daysToExam !== 1 ? "s" : ""} left. The preparation is done. Rest well, eat well, show up sharp.`,
+            `${name ? name + ", " : ""}${daysToExam} day${daysToExam !== 1 ? "s" : ""} to go. Syllabus complete. Only what you know now — sharper, tighter, ready.`,
+            `${name ? name + " — " : ""}final stretch. ${daysToExam} day${daysToExam !== 1 ? "s" : ""} left. Sleep matters as much as revision now. Don't grind yourself hollow.`,
+          ];
     paras.push(pick(lines));
     block.innerHTML = `
       <div style="background:linear-gradient(135deg,rgba(194,118,42,0.07),rgba(168,94,26,0.03));border:1px solid rgba(194,118,42,0.18);border-top:3px solid var(--indigo2);border-radius:16px;padding:20px 18px;box-shadow:0 4px 24px rgba(0,0,0,0.4)">
@@ -2596,58 +3577,134 @@ function renderCoachTab() {
           <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--indigo2),var(--kumkum));display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;box-shadow:0 0 12px rgba(194,118,42,0.3)">🎓</div>
           <div>
             <div style="font-size:0.78rem;font-weight:700;color:var(--indigo);font-family:${_PC.font};letter-spacing:0.04em">COACH</div>
-            <div style="font-size:0.62rem;color:var(--text3);font-family:${_PC.font}">${name ? name + "'s" : "Your"} personalised assessment</div>
+            <div style="font-size:0.72rem;color:var(--text2);font-family:${_PC.font}">${name ? name + "'s" : "Your"} personalised assessment</div>
           </div>
         </div>
-        ${paras.map(p => `<p style="font-size:1.02rem;color:${_PC.text};line-height:1.85;font-family:${_PC.font};font-style:italic;margin:0">${p}</p>`).join("")}
+        ${paras.map((p) => `<p style="font-size:1.02rem;color:${_PC.text};line-height:1.85;font-family:${_PC.font};font-style:italic;margin:0">${p}</p>`).join("")}
       </div>`;
     return;
   }
 
-  // ── NO EXAM DATE ──
-  if (!examDate) {
-    block.innerHTML = `
+  // ── SETUP GUIDE — shown to any user who hasn't completed setup (exam date + deadline) ──
+  // setupSeen flag is set the moment both dates are saved. Once set, never shows again.
+  // Old users with both dates already set get setupSeen backfilled in initApp on first open.
+  {
+    const _noExam = !examDate;
+    const _noDeadlineCounts =
+      !hasDeadline && (daysToExam === null || daysToExam >= 15);
+    const _showSetup =
+      _noExam || _noDeadlineCounts || !(profile && profile.setupSeen);
+    const _isLateJoin =
+      !_noExam && daysToExam !== null && daysToExam <= 14 && daysToExam > 5;
+    const _noDeadline = !hasDeadline;
+    const F = _PC.font;
+    if (_showSetup) {
+      const _step1Html = _noExam
+        ? `<div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${_PC.indigo};border-radius:10px;padding:11px 14px">
+          <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.1em;color:${_PC.indigo};font-family:${F};margin-bottom:5px">STEP 1 — SET YOUR EXAM DATE ← START HERE</div>
+          <div style="font-size:0.82rem;color:${_PC.text};font-family:${F};line-height:1.6">Open the menu (top left) → Profile → set your <strong style="color:${_PC.text}">Exam Date</strong>. Every single number in this app — pace, urgency, revision schedule — anchors to this date. Without it I'm completely blind.</div>
+        </div>`
+        : `<div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${_PC.green};border-radius:10px;padding:11px 14px">
+          <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.1em;color:${_PC.green};font-family:${F};margin-bottom:5px">STEP 1 — EXAM DATE ✓</div>
+          <div style="font-size:0.82rem;color:${_PC.text2};font-family:${F};line-height:1.6">Set. Everything anchors to ${fmtDate(examDate)}.</div>
+        </div>`;
+
+      const _step2Html = _noDeadline
+        ? `<div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${_noExam ? _PC.text3 : _PC.indigo};border-radius:10px;padding:11px 14px">
+          <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.1em;color:${_noExam ? _PC.text3 : _PC.indigo};font-family:${F};margin-bottom:5px">STEP 2 — SET YOUR STUDY DEADLINE${_noExam ? "" : " ← DO THIS NOW"}</div>
+          <div style="font-size:0.82rem;color:${_noExam ? _PC.text3 : _PC.text};font-family:${F};line-height:1.6">${_noExam ? "Set your exam date first, then come back to this step." : 'Go to the <strong style="color:' + _PC.text + '">Progress tab</strong> → Set Your Study Deadline. This is the date you want to finish all chapters by — <strong style="color:' + _PC.text + '">not your exam date</strong>. I use this for all pace calculations and urgency signals.'}</div>
+        </div>`
+        : `<div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${_PC.green};border-radius:10px;padding:11px 14px">
+          <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.1em;color:${_PC.green};font-family:${F};margin-bottom:5px">STEP 2 — STUDY DEADLINE ✓</div>
+          <div style="font-size:0.82rem;color:${_PC.text2};font-family:${F};line-height:1.6">Set. I'm using ${fmtDate(profile.deadline)} for all pace calculations.</div>
+        </div>`;
+
+      const _step3Msg = _isLateJoin
+        ? `Go to the <strong style="color:${_PC.text}">Add tab</strong>. Only add chapters you have <strong style="color:${_PC.text}">already studied</strong> — mark them Completed. Do not add chapters you haven't covered yet. I will schedule revisions from tomorrow. Focus on your highest-weightage subjects first.`
+        : `Go to the <strong style="color:${_PC.text}">Add tab</strong>. Add your syllabus chapters and mark the ones you've already covered as <strong style="color:${_PC.text}">Completed</strong>. The moment you do, I schedule 4 revision sessions automatically: next day (R1), 3 days later (R2), 1 week later (R3), 1 month later (R4). That's how memory gets locked in before exam day.`;
+
+      const _step3Html = `<div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${!_noExam && !_noDeadline ? _PC.indigo : _PC.text3};border-radius:10px;padding:11px 14px">
+        <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.1em;color:${!_noExam && !_noDeadline ? _PC.indigo : _PC.text3};font-family:${F};margin-bottom:5px">STEP 3 — ADD YOUR CHAPTERS${!_noExam && !_noDeadline ? " ← DO THIS NOW" : ""}</div>
+        <div style="font-size:0.82rem;color:${!_noExam && !_noDeadline ? _PC.text : _PC.text3};font-family:${F};line-height:1.6">${!_noExam && !_noDeadline ? _step3Msg : "Complete steps 1 and 2 first."}</div>
+      </div>`;
+
+      const _howHtml = `<div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:10px;padding:11px 14px;margin-bottom:12px">
+        <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.1em;color:${_PC.text2};font-family:${F};margin-bottom:6px">HOW THIS APP WORKS</div>
+        <div style="font-size:0.88rem;color:${_PC.text2};font-family:${F};line-height:1.7">You add chapters and mark them done. I build a <strong style="color:${_PC.text}">spaced revision schedule</strong> automatically — R1 next day, R2 after 3 days, R3 after 1 week, R4 after 1 month. This is how memory actually sticks for exams. I also track your <strong style="color:${_PC.text}">daily pace</strong>, tell you if you're on track to finish before your deadline, flag subjects you're neglecting, and warn you when revisions are piling up.</div>
+      </div>`;
+
+      const _btnReady = !_noExam && !_noDeadlineCounts;
+      const _dismissHtml = `<div style="text-align:center;padding-top:4px">
+        <button
+          onclick="${_btnReady ? "_setupDismiss()" : "_setupNotReady()"}"
+          style="background:${_PC.indigo};border:none;border-radius:10px;padding:11px 28px;font-size:0.85rem;font-weight:800;color:#fff;cursor:${_btnReady ? "pointer" : "not-allowed"};font-family:${F};letter-spacing:0.03em;box-shadow:0 4px 16px rgba(194,118,42,0.35);opacity:${_btnReady ? "1" : "0.4"}">
+          I've set it up — show my assessment
+        </button>
+      </div>`;
+
+      block.innerHTML = `
       <div style="background:linear-gradient(135deg,rgba(194,118,42,0.07),rgba(168,94,26,0.03));border:1px solid rgba(194,118,42,0.18);border-top:3px solid var(--indigo2);border-radius:16px;padding:20px 18px;box-shadow:0 4px 24px rgba(0,0,0,0.4)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(194,118,42,0.12)">
-          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--indigo2),var(--kumkum));display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">🎓</div>
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--indigo2),var(--kumkum));display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;box-shadow:0 0 12px rgba(194,118,42,0.3)">🎓</div>
           <div>
-            <div style="font-size:0.78rem;font-weight:700;color:var(--indigo);font-family:${_PC.font};letter-spacing:0.04em">COACH</div>
-            <div style="font-size:0.62rem;color:var(--text3);font-family:${_PC.font}">${name ? name + "'s" : "Your"} personalised assessment</div>
+            <div style="font-size:0.78rem;font-weight:700;color:var(--indigo);font-family:${F};letter-spacing:0.04em">COACH</div>
+            <div style="font-size:0.72rem;color:${_PC.text2};font-family:${F}">${name ? name + "'s" : "Your"} personalised assessment</div>
           </div>
         </div>
-        <p style="font-size:1.02rem;color:${_PC.text2};line-height:1.85;font-family:${_PC.font};margin:0">Set your exam date in Profile and I'll have something real to tell you.</p>
+        <p style="font-size:1.02rem;color:${_PC.text};line-height:1.85;font-family:${F};margin:0 0 18px 0">I'm your personal coach${name ? ", " + name : ""}. This app works entirely on the data you give it — the more accurately you set it up, the more useful I become. Let's do this right.</p>
+        ${_howHtml}
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+          ${_step1Html}
+          ${_step2Html}
+          ${_step3Html}
+        </div>
+        ${_dismissHtml}
       </div>`;
-    return;
+      return;
+    }
   }
 
   // ── EMERGENCY MODE ──
   if (isEmergency) {
     const dailyNeeded = paceNeededForExam ? paceNeededForExam.toFixed(1) : "?";
     const ep = [];
-    ep.push(`${name ? name + ", " : ""}I'm not going to soften this. You have ${daysToExam} days and ${remaining} chapters left — ${completionPct}% done. That's ${dailyNeeded} chapters every single day until ${fmtDate(examDate)} with no breaks.`);
-    ep.push(`The 30-day revision window has closed, which means R3 and R4 are off the table for most chapters. The new goal is: complete each chapter, do R1 the next day, do R2 three days later. That's enough to hold memory through exam day. Speed matters more than depth right now.`);
-    ep.push(`Don't start from the top of your chapter list. Start with your highest-weightage subjects — the ones that decide your aggregate. Every hour on a low-weight chapter is an hour taken from one that matters more.`);
-    if (weakCount > 0) ep.push(`You have ${weakCount} flagged weak chapter${weakCount !== 1 ? "s" : ""} — deprioritise those unless they're high-weightage. You can't afford perfectionism right now.`);
-    ep.push(pick([
-      `Hard and impossible aren't the same thing. Start with one chapter today — right now.`,
-      `You still have time to make this count. But only if you start today, not tomorrow.`,
-      `${daysToExam} days is more than most people think it is. Use every one of them.`,
-      `The clock is real but so is your capacity. One chapter at a time — that's all it takes.`,
-      `Don't let the size of the problem stop you from solving the first piece of it. Open a chapter now.`,
-      `Exams have been passed from worse positions. Decide right now that you're not stopping until this is done.`,
-    ]));
-    const emergBody = ep.map((p, i) => {
-      const mb = i < ep.length - 1 ? "16px" : "0";
-      const isCloser = i === ep.length - 1;
-      return `<p style="font-size:${isCloser ? "0.95rem" : "1.02rem"};color:${isCloser ? _PC.text2 : _PC.text};line-height:1.85;font-family:${_PC.font};margin:0 0 ${mb} 0">${p}</p>`;
-    }).join("");
+    ep.push(
+      `${name ? name + ", " : ""}I'm not going to soften this. You have ${daysToExam} days and ${remaining} chapters left — ${completionPct}% done. That's ${dailyNeeded} chapters every single day until ${fmtDate(examDate)} with no breaks.`,
+    );
+    ep.push(
+      `The revision window has closed, which means R3 and R4 are off the table for most chapters. The new goal is: complete each chapter, do R1 the next day, do R2 three days later. That's enough to hold memory through exam day. Speed matters more than depth right now.`,
+    );
+    ep.push(
+      `Don't start from the top of your chapter list. Start with your highest-weightage subjects — the ones that decide your aggregate. Every hour on a low-weight chapter is an hour taken from one that matters more.`,
+    );
+    if (weakCount > 0)
+      ep.push(
+        `You have ${weakCount} flagged weak chapter${weakCount !== 1 ? "s" : ""} — deprioritise those unless they're high-weightage. You can't afford perfectionism right now.`,
+      );
+    ep.push(
+      pick([
+        `Hard and impossible aren't the same thing. Start with one chapter today — right now.`,
+        `You still have time to make this count. But only if you start today, not tomorrow.`,
+        `${daysToExam} days is more than most people think it is. Use every one of them.`,
+        `The clock is real but so is your capacity. One chapter at a time — that's all it takes.`,
+        `Don't let the size of the problem stop you from solving the first piece of it. Open a chapter now.`,
+        `Exams have been passed from worse positions. Decide right now that you're not stopping until this is done.`,
+      ]),
+    );
+    const emergBody = ep
+      .map((p, i) => {
+        const mb = i < ep.length - 1 ? "16px" : "0";
+        const isCloser = i === ep.length - 1;
+        return `<p style="font-size:${isCloser ? "0.95rem" : "1.02rem"};color:${isCloser ? _PC.text2 : _PC.text};line-height:1.85;font-family:${_PC.font};margin:0 0 ${mb} 0">${p}</p>`;
+      })
+      .join("");
     block.innerHTML = `
       <div style="background:linear-gradient(135deg,rgba(194,118,42,0.07),rgba(168,94,26,0.03));border:1px solid rgba(194,118,42,0.18);border-top:3px solid ${_PC.red};border-radius:16px;padding:20px 18px;box-shadow:0 4px 24px rgba(0,0,0,0.4)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid rgba(194,118,42,0.12)">
           <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,${_PC.red},${_PC.orange});display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;box-shadow:0 0 12px rgba(248,113,113,0.3)">🚨</div>
           <div>
             <div style="font-size:0.78rem;font-weight:700;color:${_PC.red};font-family:${_PC.font};letter-spacing:0.04em">EMERGENCY MODE</div>
-            <div style="font-size:0.62rem;color:${_PC.text3};font-family:${_PC.font}">${name ? name + "'s" : "Your"} personalised assessment</div>
+            <div style="font-size:0.72rem;color:${_PC.text2};font-family:${_PC.font}">${name ? name + "'s" : "Your"} personalised assessment</div>
           </div>
         </div>
         ${emergBody}
@@ -2661,145 +3718,245 @@ function renderCoachTab() {
 
     // Opening — trend-aware, day-of-week aware, streak-tier aware
     if (paceImproving && !paceRecovering) {
-      p.push(pick([
-        `${name ? name + ", " : ""}something shifted this week — let's talk about it.`,
-        `${name ? name + " — " : ""}the numbers look different this week. Here's where things stand.`,
-        `${name ? name + ", " : ""}the trend is moving your way. Let's make sure it holds.`,
-        `${name ? name + " — " : ""}good week so far. Here's the full picture.`,
-        `${name ? name + ", " : ""}you're picking up pace — worth understanding why before the momentum dips.`,
-      ]));
+      p.push(
+        onTrackForSafe
+          ? pick([
+              `${name ? name + ", " : ""}something shifted this week — let's talk about it.`,
+              `${name ? name + " — " : ""}the numbers look different this week. Here's where things stand.`,
+              `${name ? name + ", " : ""}the trend is moving your way. Let's make sure it holds.`,
+              `${name ? name + " — " : ""}good week so far. Here's the full picture.`,
+              `${name ? name + ", " : ""}you're picking up pace — worth understanding why before the momentum dips.`,
+            ])
+          : pick([
+              `${name ? name + ", " : ""}pace has picked up this week — that matters. Here's where things still stand.`,
+              `${name ? name + " — " : ""}the trend is moving in the right direction. But the full picture needs attention.`,
+              `${name ? name + ", " : ""}you're improving. Let's be clear about how much ground there is left to cover.`,
+            ]),
+      );
     } else if (paceSlipping) {
-      p.push(pick([
-        `${name ? name + ", " : ""}I need to flag something before it becomes a problem.`,
-        `${name ? name + " — " : ""}the trend this week needs attention.`,
-        `${name ? name + ", " : ""}the numbers are drifting in the wrong direction. Let's address it.`,
-        `${name ? name + " — " : ""}pace has slipped. That's fixable, but only if we talk about it now.`,
-        `${name ? name + ", " : ""}something's off this week and I'd rather you hear it from me than discover it too late.`,
-      ]));
+      p.push(
+        pick([
+          `${name ? name + ", " : ""}I need to flag something before it becomes a problem.`,
+          `${name ? name + " — " : ""}the trend this week needs attention.`,
+          `${name ? name + ", " : ""}the numbers are drifting in the wrong direction. Let's address it.`,
+          `${name ? name + " — " : ""}pace has slipped. That's fixable, but only if we talk about it now.`,
+          `${name ? name + ", " : ""}something's off this week and I'd rather you hear it from me than discover it too late.`,
+        ]),
+      );
     } else if (zone === 1) {
-      p.push(pick([
-        `${name ? name + ", " : ""}here's where things stand.`,
-        `Let's take stock, ${name || "friend"}.`,
-        `${name ? name + " — " : ""}good time to check in.`,
-        isMon ? `${name ? name + ", " : ""}fresh week. Here's the picture.` :
-        isFri ? `${name ? name + ", " : ""}end of the week — let's see how it went.` :
-        isWeekend ? `${name ? name + ", " : ""}weekend check-in. Here's where you are.` :
-        `${name ? name + ", " : ""}midweek — good moment to take stock.`,
-        streakTier >= 2 ? `${name ? name + ", " : ""}${streakCount} days in a row and counting. Here's the full picture.` :
-        streakTier === 1 ? `${name ? name + ", " : ""}you've got a small streak going. Let's see what to do with it.` :
-        `${name ? name + ", " : ""}every day is a fresh start. Here's today's picture.`,
-        `${name ? name + " — " : ""}no drama. Let's just see where things are.`,
-      ]));
+      p.push(
+        pick([
+          `${name ? name + ", " : ""}here's where things stand.`,
+          `Let's take stock, ${name || "friend"}.`,
+          `${name ? name + " — " : ""}good time to check in.`,
+          isMon
+            ? `${name ? name + ", " : ""}fresh week. Here's the picture.`
+            : isFri
+              ? `${name ? name + ", " : ""}end of the week — let's see how it went.`
+              : isWeekend
+                ? `${name ? name + ", " : ""}weekend check-in. Here's where you are.`
+                : `${name ? name + ", " : ""}midweek — good moment to take stock.`,
+          streakTier >= 2
+            ? `${name ? name + ", " : ""}${streakCount} days in a row and counting. Here's the full picture.`
+            : streakTier === 1
+              ? `${name ? name + ", " : ""}you've got a small streak going. Let's see what to do with it.`
+              : `${name ? name + ", " : ""}every day is a fresh start. Here's today's picture.`,
+          `${name ? name + " — " : ""}no drama. Let's just see where things are.`,
+        ]),
+      );
     } else if (zone === 2) {
-      p.push(pick([
-        `${name ? name + ", " : ""}I need your attention on something.`,
-        `${name || ""}, the window is getting smaller.`,
-        `Time to be real, ${name || "friend"}.`,
-        `${name ? name + ", " : ""}the margin for comfort is narrowing. Here's where you stand.`,
-        isMon ? `${name ? name + ", " : ""}new week, but the clock doesn't reset. Let's talk.` :
-        isFri ? `${name ? name + ", " : ""}week's almost done — let's be honest about how it went.` :
-        `${name ? name + " — " : ""}this is the part of prep where honesty matters most.`,
-        `${name ? name + ", " : ""}the situation has shifted. You need to hear this.`,
-      ]));
+      p.push(
+        pick([
+          `${name ? name + ", " : ""}I need your attention on something.`,
+          `${name || ""}, the window is getting smaller.`,
+          `Time to be real, ${name || "friend"}.`,
+          `${name ? name + ", " : ""}the margin for comfort is narrowing. Here's where you stand.`,
+          isMon
+            ? `${name ? name + ", " : ""}new week, but the clock doesn't reset. Let's talk.`
+            : isFri
+              ? `${name ? name + ", " : ""}week's almost done — let's be honest about how it went.`
+              : `${name ? name + " — " : ""}this is the part of prep where honesty matters most.`,
+          `${name ? name + ", " : ""}the situation has shifted. You need to hear this.`,
+        ]),
+      );
     } else if (zone === 3) {
-      p.push(pick([
-        `${name ? name + ", " : ""}I'm going to be straight with you.`,
-        `Okay ${name || ""}, the situation is what it is. Let's make the most of it.`,
-        `${name ? name + " — " : ""}no sugarcoating today.`,
-        `${name ? name + ", " : ""}we're past the point of comfortable pacing. Here's what's real.`,
-        `${name ? name + " — " : ""}I won't soften this, but I won't catastrophise either. Facts only.`,
-        `${name ? name + ", " : ""}late is not the same as too late. Let's work out what's actually possible.`,
-      ]));
+      p.push(
+        pick([
+          `${name ? name + ", " : ""}I'm going to be straight with you.`,
+          `Okay ${name || ""}, the situation is what it is. Let's make the most of it.`,
+          `${name ? name + " — " : ""}no sugarcoating today.`,
+          `${name ? name + ", " : ""}we're past the point of comfortable pacing. Here's what's real.`,
+          `${name ? name + " — " : ""}I won't soften this, but I won't catastrophise either. Facts only.`,
+          `${name ? name + ", " : ""}late is not the same as too late. Let's work out what's actually possible.`,
+        ]),
+      );
     }
 
     // Situation — structural variety: lead with days, pct, remaining, or equation framing
     if (remaining === 0) {
-      p.push(pick([
-        `You've finished all ${total} chapters. Everything now rides on your revisions.`,
-        `All ${total} chapters done — the studying is over. It's revision season.`,
-        `${completionPct}% complete — that means 100%. Every chapter covered. Now it's all revision.`,
-        `${total} chapters, all ticked off. What's left is locking in what you already know.`,
-      ]));
+      p.push(
+        pick([
+          `You've finished all ${total} chapters. Everything now rides on your revisions.`,
+          `All ${total} chapters done — the studying is over. It's revision season.`,
+          `${completionPct}% complete — that means 100%. Every chapter covered. Now it's all revision.`,
+          `${total} chapters, all ticked off. What's left is locking in what you already know.`,
+        ]),
+      );
     } else {
-      p.push(pick([
-        `You have ${daysToExam} days until your exam and ${remaining} chapters still to go.`,
-        `${remaining} chapters remaining, ${daysToExam} days on the clock.`,
-        `You've covered ${completed} of ${total} chapters — ${completionPct}% done, ${remaining} to go.`,
-        `${completionPct}% of the syllabus is behind you. ${remaining} chapters and ${daysToExam} days stand between you and exam day.`,
-        `${daysToExam} days left. ${remaining} chapters left. That's the equation right now.`,
-        `With ${daysToExam} days to the exam, you need to clear ${remaining} more chapter${remaining !== 1 ? "s" : ""} — you're ${completionPct}% of the way there.`,
-        `${remaining} chapter${remaining !== 1 ? "s" : ""} to go out of ${total}. The exam is ${daysToExam} day${daysToExam !== 1 ? "s" : ""} away.`,
-      ]));
+      p.push(
+        pick([
+          `You have ${daysToExam} days until your exam and ${remaining} chapters still to go.`,
+          `${remaining} chapters remaining, ${daysToExam} days on the clock.`,
+          `You've covered ${completed} of ${total} chapters — ${completionPct}% done, ${remaining} to go.`,
+          `${completionPct}% of the syllabus is behind you. ${remaining} chapters and ${daysToExam} days stand between you and exam day.`,
+          `${daysToExam} days left. ${remaining} chapters left. That's the equation right now.`,
+          `With ${daysToExam} days to the exam, you need to clear ${remaining} more chapter${remaining !== 1 ? "s" : ""} — you're ${completionPct}% of the way there.`,
+          `${remaining} chapter${remaining !== 1 ? "s" : ""} to go out of ${total}. The exam is ${daysToExam} day${daysToExam !== 1 ? "s" : ""} away.`,
+        ]),
+      );
     }
 
     // Trend signal
     if (paceRecovering) {
-      p.push(`This week you completed ${last7completed} chapter${last7completed !== 1 ? "s" : ""} after nothing the week before. That's the turnaround. Keep it going.`);
+      p.push(
+        `This week you completed ${last7completed} chapter${last7completed !== 1 ? "s" : ""} after nothing the week before. That's the turnaround. Keep it going.`,
+      );
     } else if (paceImproving) {
-      p.push(`Your pace has picked up — ${last7completed} chapters this week vs ${prev7completed} last week. That shift matters.`);
+      p.push(
+        `Your pace has picked up — ${last7completed} chapters this week vs ${prev7completed} last week. That shift matters.`,
+      );
     } else if (paceSlipping) {
-      p.push(`Your pace has dropped — ${last7completed} chapter${last7completed !== 1 ? "s" : ""} this week vs ${prev7completed} last week. That trend needs to reverse before it costs you.`);
+      p.push(
+        `Your pace has dropped — ${last7completed} chapter${last7completed !== 1 ? "s" : ""} this week vs ${prev7completed} last week. That trend needs to reverse before it costs you.`,
+      );
     }
 
     // Assessment — now with full date context
     if (remaining === 0 && chapsLosingR4 > 0) {
-      p.push(`${chapsLosingR4} completed chapter${chapsLosingR4 !== 1 ? "s" : ""} will miss their R4 revision before the exam — but R1, R2, and R3 still count.`);
+      p.push(
+        `${chapsLosingR4} completed chapter${chapsLosingR4 !== 1 ? "s" : ""} will miss their R4 revision before the exam — but R1, R2, and R3 still count.`,
+      );
+    } else if (remaining === 0 && missedPermCount > 0) {
+      p.push(
+        `All ${total} chapters done — but ${missedPermCount} revision${missedPermCount !== 1 ? "s" : ""} permanently missed. The syllabus is covered; the memory isn't. Every missed revision is a chapter that will fade before exam day. Treat each one as a chapter you need to re-read.`,
+      );
     } else if (remaining === 0) {
-      p.push(pick([
-        `Your revision chain looks healthy. Keep clearing what's due each day.`,
-        `All that's left now is staying on top of your revision schedule.`,
-        `Revision mode. Every session from here is memory you're securing for the exam.`,
-        `The syllabus is done — your job now is to keep the revision chain clean and unbroken.`,
-      ]));
+      p.push(
+        pick([
+          `Your revision chain looks healthy. Keep clearing what's due each day.`,
+          `All that's left now is staying on top of your revision schedule.`,
+          `Revision mode. Every session from here is memory you're securing for the exam.`,
+          `The syllabus is done — your job now is to keep the revision chain clean and unbroken.`,
+        ]),
+      );
     } else if (inRevisionWindow) {
-      p.push(pick([
-        `You're inside the 30-day revision window. Any new chapter started now won't get its full cycle before the exam.`,
-        `The safe chapter-completion window has closed. Revisions matter more than new chapters now.`,
-        `Inside the final 30 days, every revision session counts more than a new chapter would.`,
-        `The window for full revision cycles has passed. Focus on depth over breadth from here.`,
-      ]));
+      p.push(
+        remaining > 0
+          ? pick([
+              `You're in the revision window with ${remaining} chapter${remaining !== 1 ? "s" : ""} still to go. Keep completing — every chapter finished now still gets at least 2 revision sessions before the exam. Prioritise by weightage.`,
+              `The safe chapter-completion window has closed, but you still have ${remaining} chapter${remaining !== 1 ? "s" : ""} remaining. Don't stop — finish what you can and revise everything you've done in parallel.`,
+              `Inside the revision window with ${remaining} unfinished chapter${remaining !== 1 ? "s" : ""}. The goal now is complete-and-revise simultaneously — highest-weightage subjects first.`,
+            ])
+          : pick([
+              `You're inside the revision window — syllabus is complete. Every revision session from here compounds what you've already built.`,
+              `The chapter-completion window has closed and you've covered the full syllabus. Focus on depth — R1 through R4 on everything.`,
+              `The window for full revision cycles has passed. Syllabus done — go deep on what you've covered.`,
+            ]),
+      );
     } else if (projectedFinish && projBeforeSafe) {
-      const bufferDays = Math.round((dateKeyToUTC(safeFinishDate) - dateKeyToUTC(projectedFinish)) / 86400000);
-      p.push(pick([
-        `At your current pace you're finishing around ${fmtDate(projectedFinish)} — ${bufferDays} day${bufferDays !== 1 ? "s" : ""} inside your safe window (${fmtDate(safeFinishDate)}). Exam is ${fmtDate(examDate)}.`,
-        `Projected finish: ${fmtDate(projectedFinish)}. Safe window closes ${fmtDate(safeFinishDate)}. Exam: ${fmtDate(examDate)}. You're ${bufferDays} day${bufferDays !== 1 ? "s" : ""} ahead — all 4 revisions on track.`,
-        `The numbers say you finish by ${fmtDate(projectedFinish)}, which is ${bufferDays} day${bufferDays !== 1 ? "s" : ""} before your safe deadline of ${fmtDate(safeFinishDate)}. Exam is ${fmtDate(examDate)}. You're on the right side of the line.`,
-        `Current pace puts your finish at ${fmtDate(projectedFinish)} — that's ${bufferDays} day${bufferDays !== 1 ? "s" : ""} of buffer before the safe window closes. Exam: ${fmtDate(examDate)}.`,
-      ]));
-    } else if (projectedFinish && !projBeforeSafe) {
-      const overBy = Math.round((dateKeyToUTC(projectedFinish) - dateKeyToUTC(safeFinishDate)) / 86400000);
-      p.push(pick([
-        `At this pace you're finishing around ${fmtDate(projectedFinish)} — ${overBy} day${overBy !== 1 ? "s" : ""} after your safe window closes on ${fmtDate(safeFinishDate)}. Exam is ${fmtDate(examDate)}.`,
-        `The math puts your finish at ${fmtDate(projectedFinish)}, which is ${overBy} day${overBy !== 1 ? "s" : ""} past the safe window (${fmtDate(safeFinishDate)}). Your exam is ${fmtDate(examDate)}.`,
-        `Projected: done by ${fmtDate(projectedFinish)}. Safe deadline: ${fmtDate(safeFinishDate)}. That's ${overBy} day${overBy !== 1 ? "s" : ""} over — and it means some revision cycles get cut short. Exam is ${fmtDate(examDate)}.`,
-        `You're tracking to finish ${overBy} day${overBy !== 1 ? "s" : ""} late relative to your safe window (${fmtDate(safeFinishDate)}). Exam: ${fmtDate(examDate)}. Pace needs to lift.`,
-      ]));
+      const bufferDays = Math.round(
+        (dateKeyToUTC(safeFinishDate) - dateKeyToUTC(projectedFinish)) /
+          86400000,
+      );
+      const _inGrace = bufferDays < 0;
+      p.push(
+        _inGrace
+          ? pick([
+              `At your current pace you're finishing around ${fmtDate(projectedFinish)} — just past your safe window of ${fmtDate(safeFinishDate)}, but close enough to recover with a small lift. Exam is ${fmtDate(examDate)}.`,
+              `Projected finish: ${fmtDate(projectedFinish)}. That's just after your safe window closes on ${fmtDate(safeFinishDate)}, but your pace is close enough that a slight push gets you there. Exam: ${fmtDate(examDate)}.`,
+              `The numbers put your finish at ${fmtDate(projectedFinish)} — a few days past ${fmtDate(safeFinishDate)}, but within striking range. A small daily increase closes it before the exam on ${fmtDate(examDate)}.`,
+              `Current pace: finishing around ${fmtDate(projectedFinish)}, just outside the safe window. You're in the zone — a slightly higher daily rate locks it in before ${fmtDate(examDate)}.`,
+            ])
+          : pick([
+              `At your current pace you're finishing around ${fmtDate(projectedFinish)} — ${bufferDays} day${bufferDays !== 1 ? "s" : ""} inside your safe window (${fmtDate(safeFinishDate)}). Exam is ${fmtDate(examDate)}.`,
+              `Projected finish: ${fmtDate(projectedFinish)}. Safe window closes ${fmtDate(safeFinishDate)}. Exam: ${fmtDate(examDate)}. You're ${bufferDays} day${bufferDays !== 1 ? "s" : ""} ahead — all 4 revisions on track.`,
+              `The numbers say you finish by ${fmtDate(projectedFinish)}, which is ${bufferDays} day${bufferDays !== 1 ? "s" : ""} before your safe deadline of ${fmtDate(safeFinishDate)}. Exam is ${fmtDate(examDate)}. You're on the right side of the line.`,
+              `Current pace puts your finish at ${fmtDate(projectedFinish)} — that's ${bufferDays} day${bufferDays !== 1 ? "s" : ""} of buffer before the safe window closes. Exam: ${fmtDate(examDate)}.`,
+            ]),
+      );
+    } else if (
+      projectedFinish &&
+      !projBeforeSafe &&
+      studyDaysCount >= 2 &&
+      completed >= 3
+    ) {
+      const overBy = Math.round(
+        (dateKeyToUTC(projectedFinish) - dateKeyToUTC(safeFinishDate)) /
+          86400000,
+      );
+      p.push(
+        pick([
+          `At this pace you're finishing around ${fmtDate(projectedFinish)} — ${overBy} day${overBy !== 1 ? "s" : ""} after your safe window closes on ${fmtDate(safeFinishDate)}. Exam is ${fmtDate(examDate)}.`,
+          `The math puts your finish at ${fmtDate(projectedFinish)}, which is ${overBy} day${overBy !== 1 ? "s" : ""} past the safe window (${fmtDate(safeFinishDate)}). Your exam is ${fmtDate(examDate)}.`,
+          `Projected: done by ${fmtDate(projectedFinish)}. Safe deadline: ${fmtDate(safeFinishDate)}. That's ${overBy} day${overBy !== 1 ? "s" : ""} over — and it means some revision cycles get cut short. Exam is ${fmtDate(examDate)}.`,
+          `You're tracking to finish ${overBy} day${overBy !== 1 ? "s" : ""} late relative to your safe window (${fmtDate(safeFinishDate)}). Exam: ${fmtDate(examDate)}. Pace needs to lift.`,
+        ]),
+      );
     } else if (currentPace === 0 && remaining > 0) {
-      p.push(pick([
-        `No completed chapters yet — I can't project a finish date. Let's change that today.`,
-        `The first chapter you complete gives me something to work with. Start there.`,
-        `Right now the data shows zero completed chapters. One chapter changes everything I can tell you.`,
-        `I need at least one completed chapter to give you a real projection. That's your task for today.`,
-      ]));
+      p.push(
+        pick([
+          `No completed chapters yet — I can't project a finish date. Let's change that today.`,
+          `The first chapter you complete gives me something to work with. Start there.`,
+          `Right now the data shows zero completed chapters. One chapter changes everything I can tell you.`,
+          `I need at least one completed chapter to give you a real projection. That's your task for today.`,
+        ]),
+      );
+    }
+
+    // Study duration context — only after 14+ days so it's meaningful
+    if (
+      daysSinceStart !== null &&
+      daysSinceStart >= 14 &&
+      remaining > 0 &&
+      !inRevisionWindow
+    ) {
+      p.push(
+        pick([
+          `${daysSinceStart} days into your preparation — ${completed} chapter${completed !== 1 ? "s" : ""} done, ${remaining} to go.`,
+          `You're ${daysSinceStart} days in. ${completed} chapter${completed !== 1 ? "s" : ""} complete, ${remaining} remaining.`,
+          `${daysSinceStart} days of preparation so far — ${completed} done, ${remaining} still ahead.`,
+        ]),
+      );
     }
 
     // Zone boundary warning
     if (nearZoneDrop && remaining > 0) {
-      p.push(`You're ${safeDaysLeft} days from your study window tightening significantly. This is the time to accelerate, not maintain.`);
+      p.push(
+        `You're ${safeDaysLeft} days from your study window tightening significantly. This is the time to accelerate, not maintain.`,
+      );
     }
 
     // Deadline woven in naturally
     if (!hasDeadline && suggestedDeadline) {
-      p.push(pick([
-        `You haven't set a study deadline yet. Based on where you are, ${fmtDate(suggestedDeadline)} is the right target — it protects your full revision cycle. Set it in the Progress tab.`,
-        `One thing worth doing: set a study deadline. For your exam, finishing by ${fmtDate(suggestedDeadline)} gives you the full revision window. Progress tab, top of the page.`,
-        `No study deadline set yet. I'd suggest ${fmtDate(suggestedDeadline)} — that gives you enough time for all four revision cycles before ${fmtDate(examDate)}.`,
-        `Worth five seconds of your time: set ${fmtDate(suggestedDeadline)} as your chapter-completion deadline. It protects your revision chain. Progress tab.`,
-      ]));
+      p.push(
+        pick([
+          `You haven't set a study deadline yet. Based on where you are, ${fmtDate(suggestedDeadline)} is the right target — it protects your full revision cycle. Set it in the Progress tab.`,
+          `One thing worth doing: set a study deadline. For your exam, finishing by ${fmtDate(suggestedDeadline)} gives you the full revision window. Progress tab, top of the page.`,
+          `No study deadline set yet. I'd suggest ${fmtDate(suggestedDeadline)} — that gives you enough time for all four revision cycles before ${fmtDate(examDate)}.`,
+          `Worth five seconds of your time: set ${fmtDate(suggestedDeadline)} as your chapter-completion deadline. It protects your revision chain. Progress tab.`,
+        ]),
+      );
     } else if (hasDeadline && !inRevisionWindow) {
-      const dLeft = Math.max(0, Math.round((dateKeyToUTC(profile.deadline) - dateKeyToUTC(today)) / 86400000));
+      const dLeft = Math.max(
+        0,
+        Math.round(
+          (dateKeyToUTC(profile.deadline) - dateKeyToUTC(today)) / 86400000,
+        ),
+      );
       if (dLeft <= 7 && remaining > 0) {
-        p.push(`Your study deadline is in ${dLeft} day${dLeft !== 1 ? "s" : ""} — that's very close. ${remaining} chapters still to go.`);
+        p.push(
+          `Your study deadline is in ${dLeft} day${dLeft !== 1 ? "s" : ""} — that's very close. ${remaining} chapters still to go.`,
+        );
       }
     }
 
@@ -2811,94 +3968,485 @@ function renderCoachTab() {
     const p = [];
 
     if (todayRevsDue > 0) {
-      p.push(pick([
-        `${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} due today — clear those before anything else.`,
-        `${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} waiting right now. Get those done first.`,
-        `Start with your ${todayRevsDue} due revision${todayRevsDue !== 1 ? "s" : ""} — they take priority over new chapters.`,
-        `Today has ${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} on the schedule. That's your first job.`,
-        `${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} sitting in the queue — knock those out before you open anything new.`,
-      ]));
+      p.push(
+        pick([
+          `${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} due today — clear those before anything else.`,
+          `${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} waiting right now. Get those done first.`,
+          `Start with your ${todayRevsDue} due revision${todayRevsDue !== 1 ? "s" : ""} — they take priority over new chapters.`,
+          `Today has ${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} on the schedule. That's your first job.`,
+          `${todayRevsDue} revision${todayRevsDue !== 1 ? "s" : ""} sitting in the queue — knock those out before you open anything new.`,
+        ]),
+      );
     }
 
-    if (mostNeglectedSubj && mostNeglectedDays > 7) {
-      p.push(pick([
-        `${mostNeglectedSubj} hasn't been touched in ${mostNeglectedDays} days — that's the gap to close.`,
-        `The biggest subject gap is ${mostNeglectedSubj} — ${mostNeglectedDays} days untouched.`,
-        `${mostNeglectedDays} days since you looked at ${mostNeglectedSubj}. That subject needs some time today.`,
-        `${mostNeglectedSubj} is falling behind — ${mostNeglectedDays} days without a session. It should be on today's list.`,
-        `Of all your subjects, ${mostNeglectedSubj} has gone the longest without attention: ${mostNeglectedDays} days. Fix that today.`,
-      ]));
+    {
+      // Build full per-subject slipping/neglected list — same thresholds as Intelligence
+      const _subjActivityList = _allSubjects
+        .map((subj) => {
+          const chs = subjectMap[subj] || [];
+          // Untouched subject — no chapters added at all
+          if (chs.length === 0) {
+            const _profileAge =
+              profile && profile.dateCreated
+                ? Math.round(
+                    (dateKeyToUTC(today) - dateKeyToUTC(profile.dateCreated)) /
+                      86400000,
+                  )
+                : 0;
+            if (_profileAge < 7) return null; // too early to flag
+            return {
+              subj,
+              daysSince: _profileAge,
+              subjImproving: false,
+              isUntouched: true,
+            };
+          }
+          const revDates = revisions
+            .filter(
+              (r) =>
+                r.done &&
+                r.completedOn &&
+                chs.find((c) => c.id === r.chapterId),
+            )
+            .map((r) => r.completedOn)
+            .sort()
+            .reverse();
+          const addedDates = chs
+            .map((c) => c.completedDate || c.dateAdded)
+            .filter(Boolean)
+            .sort()
+            .reverse();
+          const lastDate = revDates[0] || addedDates[0];
+          if (!lastDate) return null;
+          // Per-subject trend: chapters done in last 7 days vs previous 7 days
+          const _s7 = chs.filter(
+            (c) =>
+              c.status === "Completed" &&
+              (c.completedDate || c.dateAdded) &&
+              dateKeyToUTC(c.completedDate || c.dateAdded) >=
+                dateKeyToUTC(addDays(today, -6)),
+          ).length;
+          const _p7 = chs.filter(
+            (c) =>
+              c.status === "Completed" &&
+              (c.completedDate || c.dateAdded) &&
+              dateKeyToUTC(c.completedDate || c.dateAdded) >=
+                dateKeyToUTC(addDays(today, -13)) &&
+              dateKeyToUTC(c.completedDate || c.dateAdded) <
+                dateKeyToUTC(addDays(today, -6)),
+          ).length;
+          const subjImproving = _s7 > _p7 && _s7 >= 1;
+          const daysSince = Math.round(
+            (dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000,
+          );
+          return { subj, daysSince, subjImproving, isUntouched: false };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.daysSince - a.daysSince);
+
+      const neglected = _subjActivityList.filter((s) =>
+        s.isUntouched ? s.daysSince > 6 : s.daysSince > 14,
+      );
+      const slipping = _subjActivityList.filter(
+        (s) => !s.isUntouched && s.daysSince > 7 && s.daysSince <= 14,
+      );
+      const improving = _subjActivityList.filter((s) => s.subjImproving);
+
+      if (neglected.length > 0) {
+        const _untouched = neglected.filter((s) => s.isUntouched);
+        const _touched = neglected.filter((s) => !s.isUntouched);
+        if (_untouched.length > 0 && _touched.length === 0) {
+          // All neglected subjects are completely unstarted
+          p.push(
+            _untouched.length === 1
+              ? pick([
+                  `${_untouched[0].subj} has no chapters added yet. It's part of your exam — it can't stay at zero.`,
+                  `You haven't started ${_untouched[0].subj} at all. ICSE marks it separately — open it today.`,
+                  `${_untouched[0].subj} is completely unstarted. That needs to change before the exam.`,
+                ])
+              : pick([
+                  `${_untouched.length} subjects haven't been started at all: ${_untouched.map((s) => s.subj).join(", ")}. Each one is part of your exam.`,
+                  `Not started yet: ${_untouched.map((s) => s.subj).join(", ")}. These can't stay at zero — add at least one chapter from each.`,
+                ]),
+          );
+        } else if (_untouched.length > 0 && _touched.length > 0) {
+          // Mix of unstarted and neglected — lead with the unstarted
+          p.push(
+            pick([
+              `${_untouched[0].subj} hasn't been started at all, and ${_touched.length > 0 ? _touched[0].subj + " hasn't been touched in " + _touched[0].daysSince + " days" : "others are slipping too"}. Both need attention.`,
+              `Biggest gap: ${_untouched[0].subj} has no chapters added. After that, ${_touched.length > 0 ? _touched[0].subj + " is " + _touched[0].daysSince + " days idle" : "check your slipping subjects"}.`,
+            ]),
+          );
+        } else {
+          // All neglected subjects have some chapters but are idle
+          const names = _touched
+            .map((s) => `${s.subj} (${s.daysSince}d)`)
+            .join(", ");
+          p.push(
+            neglected.length === 1
+              ? pick([
+                  `${neglected[0].subj} hasn't been touched in ${neglected[0].daysSince} days — that's the gap to close.`,
+                  `${neglected[0].daysSince} days since you looked at ${neglected[0].subj}. That subject needs time today.`,
+                  `${neglected[0].subj} is falling behind — ${neglected[0].daysSince} days without a session.`,
+                ])
+              : pick([
+                  `${neglected.length} subjects haven't been touched in over 2 weeks: ${names}. These need attention.`,
+                  `Major gaps: ${names}. Each of these has gone over 14 days without a session.`,
+                ]),
+          );
+        }
+      } else if (slipping.length > 0) {
+        const names = slipping
+          .map((s) => `${s.subj} (${s.daysSince}d)`)
+          .join(", ");
+        p.push(
+          slipping.length === 1
+            ? pick([
+                `${slipping[0].subj} hasn't had a session in ${slipping[0].daysSince} days — worth fitting in today.`,
+                `${slipping[0].daysSince} days since you touched ${slipping[0].subj}. Don't let it slip further.`,
+              ])
+            : pick([
+                `${slipping.length} subjects are slipping: ${names}. A session on each this week would close those gaps.`,
+                `Starting to lag: ${names}. Each of these needs attention before they become fully neglected.`,
+              ]),
+        );
+      }
+
+      if (improving.length > 0) {
+        const names = improving.map((s) => s.subj).join(", ");
+        p.push(
+          improving.length === 1
+            ? pick([
+                `${improving[0].subj} is picking up — more chapters done this week than last. Keep that going.`,
+                `Good momentum in ${improving[0].subj} recently. Don't let it drop off.`,
+              ])
+            : pick([
+                `${improving.length} subjects gaining momentum this week: ${names}. That's the direction to build on.`,
+                `Improving recently: ${names}. Keep the same energy across all of them.`,
+              ]),
+        );
+      }
+    }
+
+    // ── Per-subject completion imbalance ──
+    {
+      const _subjCompletion = _allSubjects
+        .map((subj) => {
+          const chs = subjectMap[subj] || [];
+          const subjTotal = _syllabusTotal(subj) || chs.length;
+          const subjDone = chs.filter((c) => c.status === "Completed").length;
+          const pct =
+            subjTotal > 0 ? Math.round((subjDone / subjTotal) * 100) : 0;
+          const _isUntouched = chs.length === 0;
+          return { subj, pct, subjDone, subjTotal, _isUntouched };
+        })
+        .filter((s) => s.subjTotal >= 3 && !s._isUntouched);
+      const _behind = _subjCompletion.filter(
+        (s) => s.pct < 30 && !inRevisionWindow,
+      );
+      const _mostBehind = _behind.sort((a, b) => a.pct - b.pct)[0];
+      if (_mostBehind) {
+        p.push(
+          pick([
+            `${_mostBehind.subj} is only ${_mostBehind.pct}% done (${_mostBehind.subjDone}/${_mostBehind.subjTotal} chapters) — that's the biggest gap right now. It needs dedicated sessions before other subjects get more time.`,
+            `Watch ${_mostBehind.subj}: ${_mostBehind.pct}% complete. At ${_mostBehind.subjDone} of ${_mostBehind.subjTotal} chapters, it's the most at-risk subject. Prioritise it.`,
+            `${_mostBehind.subj} is ${_mostBehind.pct}% done — the lowest completion of any subject. ICSE marks each subject separately; this one needs focus now.`,
+          ]),
+        );
+      }
     }
 
     if (weakCount > 0) {
+      // Build per-subject weak breakdown
+      const _weakBySubj = {};
+      chapters
+        .filter((c) => c.isWeak)
+        .forEach((c) => {
+          _weakBySubj[c.subject] = (_weakBySubj[c.subject] || 0) + 1;
+        });
+      const _weakSubjs = Object.entries(_weakBySubj).sort(
+        (a, b) => b[1] - a[1],
+      );
+      const _worstWeakSubj = _weakSubjs[0];
+
       if (autoWeakCount > 0 && autoWeakCount === weakCount) {
-        p.push(`${autoWeakCount} chapter${autoWeakCount !== 1 ? "s" : ""} auto-flagged weak from missed revisions — these need extra cycles before the exam.`);
+        p.push(
+          _worstWeakSubj
+            ? pick([
+                `${autoWeakCount} chapter${autoWeakCount !== 1 ? "s" : ""} auto-flagged weak from missed revisions — ${_worstWeakSubj[0]} has the most (${_worstWeakSubj[1]}). These need extra cycles before the exam.`,
+                `Missed revisions have flagged ${autoWeakCount} chapter${autoWeakCount !== 1 ? "s" : ""} as weak. Heaviest in ${_worstWeakSubj[0]} (${_worstWeakSubj[1]}). Each needs extra revision cycles.`,
+              ])
+            : `${autoWeakCount} chapter${autoWeakCount !== 1 ? "s" : ""} auto-flagged weak from missed revisions — these need extra cycles before the exam.`,
+        );
       } else {
-        p.push(`${weakCount} weak chapter${weakCount !== 1 ? "s" : ""} flagged — keep giving those extra attention, they'll cost marks if left alone.`);
+        p.push(
+          _weakSubjs.length > 1
+            ? pick([
+                `${weakCount} weak chapters flagged across ${_weakSubjs.length} subjects — ${_worstWeakSubj[0]} has the most (${_worstWeakSubj[1]}). Don't let these slide further.`,
+                `Weak chapters: ${_weakSubjs.map(([s, n]) => `${s} (${n})`).join(", ")}. These cost marks if left alone — keep giving them extra attention.`,
+              ])
+            : pick([
+                `${weakCount} weak chapter${weakCount !== 1 ? "s" : ""} in ${_worstWeakSubj[0]} — keep giving those extra attention, they'll cost marks if left alone.`,
+                `${_worstWeakSubj[0]} has ${weakCount} flagged weak chapter${weakCount !== 1 ? "s" : ""}. These need extra revision cycles before the exam.`,
+              ]),
+        );
       }
     }
 
     if (missedPermCount > 0) {
-      p.push(`${missedPermCount} revision${missedPermCount !== 1 ? "s" : ""} permanently missed — those chapters need manual re-revision before the exam.`);
+      // Build per-subject missed revision breakdown
+      const _missedBySubj = {};
+      revisions
+        .filter((r) => r.missedPermanently)
+        .forEach((r) => {
+          _missedBySubj[r.subject] = (_missedBySubj[r.subject] || 0) + 1;
+        });
+      const _missedSubjs = Object.entries(_missedBySubj).sort(
+        (a, b) => b[1] - a[1],
+      );
+      const _worstMissedSubj = _missedSubjs[0];
+      p.push(
+        _missedSubjs.length > 1
+          ? pick([
+              `${missedPermCount} revisions permanently missed across ${_missedSubjs.length} subjects — worst in ${_worstMissedSubj[0]} (${_worstMissedSubj[1]}). Those chapters need manual re-revision before the exam.`,
+              `Permanently missed: ${_missedSubjs.map(([s, n]) => `${s} (${n})`).join(", ")}. Each of these chapters needs extra attention to compensate.`,
+            ])
+          : pick([
+              `${missedPermCount} revision${missedPermCount !== 1 ? "s" : ""} permanently missed in ${_worstMissedSubj[0]} — those chapters need manual re-revision before the exam.`,
+              `${_worstMissedSubj[0]} has ${missedPermCount} permanently missed revision${missedPermCount !== 1 ? "s" : ""}. Go back to those chapters and re-cover them manually.`,
+            ]),
+      );
     }
 
-    if (paceNeededForSafe !== null && effectivePace > 0 && !onTrackForSafe && !inRevisionWindow) {
+    // ── Pile-up warning — matches Insights PILE-UP WARNING threshold (4+ revisions in next 3 days) ──
+    {
+      let _pileupDate = null,
+        _pileupCount = 0;
+      const _totalUpcoming = revisions.filter(
+        (r) =>
+          !r.done &&
+          !r.missedPermanently &&
+          r.dueDate > today &&
+          r.dueDate <= addDays(today, 3),
+      ).length;
+      for (let _d = 1; _d <= 3; _d++) {
+        const _fd = addDays(today, _d);
+        const _dc = revisions.filter(
+          (r) => !r.done && !r.missedPermanently && r.dueDate === _fd,
+        ).length;
+        if (_dc >= 4) {
+          _pileupDate = _fd;
+          _pileupCount = _dc;
+          break;
+        }
+      }
+      if (_pileupDate) {
+        p.push(
+          pick([
+            `${_pileupCount} revisions pile up on ${fmtDate(_pileupDate)} — consider knocking some out early today to avoid a crunch.`,
+            `Heads up: ${_pileupCount} revisions are due on ${fmtDate(_pileupDate)}. Getting ahead of that today will help.`,
+            `There's a revision pile-up coming — ${_pileupCount} due on ${fmtDate(_pileupDate)}. Start clearing some now.`,
+          ]),
+        );
+      } else if (_totalUpcoming >= 6) {
+        p.push(
+          pick([
+            `${_totalUpcoming} revisions due across the next 3 days — spread but building up. Stay on top of them daily.`,
+            `${_totalUpcoming} revisions coming in the next 3 days. Clear them day by day so they don't pile up.`,
+            `Heads up: ${_totalUpcoming} revisions due over the next 3 days. Don't let them stack — do each day's batch on time.`,
+          ]),
+        );
+      }
+    }
+
+    // ── Low retention warning — matches Insights LOW RETENTION threshold (<30% fully revised) ──
+    let _lowRetFired = false;
+    {
+      const _oldChaps = syllabusChaps.filter((c) => {
+        if (c.status !== "Completed") return false;
+        const _rd = c.completedDate || c.dateAdded;
+        return (
+          _rd &&
+          Math.round((dateKeyToUTC(today) - dateKeyToUTC(_rd)) / 86400000) > 30
+        );
+      });
+      if (_oldChaps.length >= 3) {
+        const _fullyRev = _oldChaps.filter((c) =>
+          [1, 3, 7, 30].every((n) =>
+            revisions.find(
+              (r) => r.chapterId === c.id && r.dayOffset === n && r.done,
+            ),
+          ),
+        ).length;
+        if (_fullyRev / _oldChaps.length < 0.3) {
+          _lowRetFired = true;
+          p.push(
+            pick([
+              `Only ${_fullyRev} of your older chapters have all four revision cycles complete. The rest are at risk of fading before the exam — prioritise revision over new chapters today.`,
+              `Retention is low — ${_fullyRev} fully revised out of ${_oldChaps.length} chapters older than 30 days. Memory without revision won't hold to exam day.`,
+              `${_oldChaps.length - _fullyRev} chapters older than a month are missing revision cycles. That's a memory gap that will show up in the exam.`,
+            ]),
+          );
+        }
+      }
+    }
+
+    // ── Per-subject revision quality — worst subject, only when low-retention didn't already fire ──
+    if (!_lowRetFired) {
+      const _subjRevQuality = Object.keys(subjectMap)
+        .map((subj) => {
+          const _completedChs = subjectMap[subj].filter(
+            (c) => c.status === "Completed",
+          );
+          if (_completedChs.length < 3) return null;
+          const _fullyRevSubj = _completedChs.filter((c) =>
+            [1, 3, 7, 30].every((n) =>
+              revisions.find(
+                (r) => r.chapterId === c.id && r.dayOffset === n && r.done,
+              ),
+            ),
+          ).length;
+          const _revQPct = Math.round(
+            (_fullyRevSubj / _completedChs.length) * 100,
+          );
+          return {
+            subj,
+            _revQPct,
+            _fullyRevSubj,
+            _total: _completedChs.length,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a._revQPct - b._revQPct);
+      const _worstRevSubj = _subjRevQuality[0];
+      if (_worstRevSubj && _worstRevSubj._revQPct < 50) {
+        p.push(
+          pick([
+            `${_worstRevSubj.subj} has the weakest revision record — only ${_worstRevSubj._revQPct}% of its completed chapters are fully revised. Prioritise revision sessions there.`,
+            `Revision quality in ${_worstRevSubj.subj}: ${_worstRevSubj._fullyRevSubj} of ${_worstRevSubj._total} chapters fully revised (${_worstRevSubj._revQPct}%). That's the biggest retention gap right now.`,
+            `Only ${_worstRevSubj._revQPct}% of ${_worstRevSubj.subj}'s completed chapters have all four revision cycles done. That subject needs more revision time.`,
+          ]),
+        );
+      }
+    }
+
+    // ── Total revision milestone — motivational, only when on track and meaningful volume ──
+    if (
+      totalRevDone >= 10 &&
+      onTrackForSafe &&
+      !_lowRetFired &&
+      !inRevisionWindow
+    ) {
+      p.push(
+        pick([
+          `${totalRevDone} revision sessions completed so far — that's the memory work paying off. Keep the chain going.`,
+          `You've done ${totalRevDone} revisions. That's not just chapters done — that's retention being built. It compounds.`,
+          `${totalRevDone} revision cycles logged. Every one of those is a chapter that won't fade by exam day.`,
+        ]),
+      );
+    }
+
+    if (
+      paceNeededForSafe !== null &&
+      effectivePace > 0 &&
+      !onTrackForSafe &&
+      !inRevisionWindow
+    ) {
       const gap = (paceNeededForSafe - effectivePace).toFixed(1);
-      p.push(pick([
-        `You need ${paceNeededForSafe.toFixed(1)} chapters/day to finish in time — you're at ${effectivePace.toFixed(1)}. That ${gap}/day gap needs to close.`,
-        `Safe finish needs ${paceNeededForSafe.toFixed(1)}/day. You're doing ${effectivePace.toFixed(1)}. Close that ${gap}/day gap.`,
-        `The required pace is ${paceNeededForSafe.toFixed(1)} chapters/day. Your current rate is ${effectivePace.toFixed(1)}. That's a ${gap}/day shortfall to address.`,
-        `At ${effectivePace.toFixed(1)} chapters/day you're ${gap} short of the ${paceNeededForSafe.toFixed(1)}/day you need. That gap won't close itself.`,
-        `${gap} extra chapter${parseFloat(gap) !== 1 ? "s" : ""} per day — that's the difference between on-track and off-track right now. Current: ${effectivePace.toFixed(1)}, needed: ${paceNeededForSafe.toFixed(1)}.`,
-      ]));
+      const _dailyTarget = Math.ceil(paceNeededForSafe);
+      p.push(
+        pick([
+          `You need ${paceNeededForSafe.toFixed(1)} chapters/day to finish in time — you're at ${effectivePace.toFixed(1)}. That ${gap}/day gap needs to close. Aim for ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} today.`,
+          `Safe finish needs ${paceNeededForSafe.toFixed(1)}/day. You're doing ${effectivePace.toFixed(1)}. Close that ${gap}/day gap — start with ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} today.`,
+          `The required pace is ${paceNeededForSafe.toFixed(1)} chapters/day. Your current rate is ${effectivePace.toFixed(1)}. That's a ${gap}/day shortfall — ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} today gets you moving in the right direction.`,
+          `At ${effectivePace.toFixed(1)} chapters/day you're ${gap} short of the ${paceNeededForSafe.toFixed(1)}/day you need. That gap won't close itself — ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} today is the minimum.`,
+          `${gap} extra chapter${parseFloat(gap) !== 1 ? "s" : ""} per day — that's the difference between on-track and off-track right now. Current: ${effectivePace.toFixed(1)}, needed: ${paceNeededForSafe.toFixed(1)}. Make today count: ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""}.`,
+        ]),
+      );
     } else if (remaining > 0 && onTrackForSafe && !inRevisionWindow) {
+      const _dailyTarget = Math.ceil(paceNeededForSafe);
       if (paceImproving) {
-        p.push(pick([
-          `You're on track and your pace is improving — ${effectivePace.toFixed(1)}/day this week. Hold this and you're finishing ${projectedFinish ? fmtDate(projectedFinish) : "on time"}, well inside your safe window.`,
-          `Pace is strong and getting stronger — ${effectivePace.toFixed(1)}/day. Keep it going and you're comfortably on course.`,
-          `${effectivePace.toFixed(1)} chapters/day and rising. You're ahead of where you need to be — the goal now is not letting it slip.`,
-          `The pace trend is working in your favour — ${effectivePace.toFixed(1)}/day and tracking well. Projected finish: ${projectedFinish ? fmtDate(projectedFinish) : "on time"}.`,
-          `You're both on track and accelerating. ${effectivePace.toFixed(1)}/day is the number to protect.`,
-        ]));
+        p.push(
+          pick([
+            `You're on track and your pace is improving — ${effectivePace.toFixed(1)}/day this week. Hold this and you're finishing ${projectedFinish ? fmtDate(projectedFinish) : "on time"}, well inside your safe window. Keep hitting ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} a day.`,
+            `Pace is strong and getting stronger — ${effectivePace.toFixed(1)}/day. Keep it going and you're comfortably on course. ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} a day is all it takes to stay there.`,
+            `${effectivePace.toFixed(1)} chapters/day and rising. You're ahead of where you need to be — the goal now is not letting it slip below ${_dailyTarget}.`,
+            `The pace trend is working in your favour — ${effectivePace.toFixed(1)}/day and tracking well. Projected finish: ${projectedFinish ? fmtDate(projectedFinish) : "on time"}. Minimum to hold: ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} a day.`,
+            `You're both on track and accelerating. ${effectivePace.toFixed(1)}/day is the number to protect — don't let it drop below ${_dailyTarget}.`,
+          ]),
+        );
       } else {
-        p.push(pick([
-          `Pace is where it needs to be. Stay consistent.`,
-          `You're hitting the numbers. The only risk now is slowing down.`,
-          `${effectivePace.toFixed(1)} chapters/day — right where it needs to be. Consistency from here is everything.`,
-          `The numbers are solid. No changes needed — just keep doing what you're doing.`,
-          `You're on track. The job now is to not talk yourself out of a routine that's working.`,
-        ]));
+        p.push(
+          pick([
+            `Pace is where it needs to be — ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} a day keeps you on course. Stay consistent.`,
+            `You're hitting the numbers. The only risk now is slowing down — keep ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} a day as your floor.`,
+            `${effectivePace.toFixed(1)} chapters/day — right where it needs to be. ${_dailyTarget} a day from here and you're finishing on time. Don't drop below that.`,
+            `The numbers are solid. ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} a day is what it takes — no changes needed, just keep doing it.`,
+            `You're on track. The job now is to not talk yourself out of a routine that's working. ${_dailyTarget} chapter${_dailyTarget !== 1 ? "s" : ""} a day — that's it.`,
+          ]),
+        );
       }
     }
 
     // Weekly activity — fixed: no dateCreated gate
-    if (studiedDaysThisWeek <= 2) {
-      p.push(pick([
-        `${studiedDaysThisWeek} active day${studiedDaysThisWeek !== 1 ? "s" : ""} this week — that pattern won't get you where you need to be.`,
-        `Only ${studiedDaysThisWeek} study day${studiedDaysThisWeek !== 1 ? "s" : ""} out of the last 7. The gaps in your week are starting to matter.`,
-        `${studiedDaysThisWeek === 0 ? "No study days" : studiedDaysThisWeek + " day" + (studiedDaysThisWeek !== 1 ? "s" : "")} this week. That's not enough — the exam doesn't adjust for quiet weeks.`,
-        `A ${studiedDaysThisWeek}-day week isn't going to cut it. The missed days compound faster than you think.`,
-        `${studiedDaysThisWeek} out of 7 days — every gap in your week is a gap in your preparation. Today is a chance to fix that.`,
-      ]));
-    } else if (studiedDaysThisWeek >= 6) {
-      p.push(pick([
-        `${studiedDaysThisWeek} out of 7 days active this week — that kind of consistency is how exams are won.`,
-        `Nearly every day this week. Keep that going.`,
-        `${studiedDaysThisWeek}/7 days. That's elite-level consistency — don't underestimate how much it compounds.`,
-        `${studiedDaysThisWeek} days studied this week. You're showing up every day and it will show on exam day.`,
-        isWeekend ? `Even on the weekend you've kept it up — ${studiedDaysThisWeek} days this week. That's the difference maker.` :
-        `${studiedDaysThisWeek} active days and the week isn't even over. This is the habit that wins exams.`,
-      ]));
+    // studiedDaysThisWeek counts any day with chapter completion OR revision done.
+    // Streak only increments on revision completions — the two can diverge.
+    if (studiedDaysThisWeek <= 2 && streakCount <= 3) {
+      p.push(
+        pick([
+          `${studiedDaysThisWeek} active day${studiedDaysThisWeek !== 1 ? "s" : ""} this week — that pattern won't get you where you need to be.`,
+          `Only ${studiedDaysThisWeek} study day${studiedDaysThisWeek !== 1 ? "s" : ""} out of the last 7. The gaps in your week are starting to matter.`,
+          `${studiedDaysThisWeek === 0 ? "No study days" : studiedDaysThisWeek + " day" + (studiedDaysThisWeek !== 1 ? "s" : "")} this week. That's not enough — the exam doesn't adjust for quiet weeks.`,
+          `A ${studiedDaysThisWeek}-day week isn't going to cut it. The missed days compound faster than you think.`,
+          `${studiedDaysThisWeek} out of 7 days — every gap in your week is a gap in your preparation. Today is a chance to fix that.`,
+        ]),
+      );
+    } else if (studiedDaysThisWeek <= 2 && streakCount > 3) {
+      p.push(
+        pick([
+          `${studiedDaysThisWeek} day${studiedDaysThisWeek !== 1 ? "s" : ""} of chapter activity this week — your ${streakCount}-day revision streak shows you're keeping the habit alive. Make sure chapters are moving forward too.`,
+          `Only ${studiedDaysThisWeek} active day${studiedDaysThisWeek !== 1 ? "s" : ""} this week, but your ${streakCount}-day streak says you're showing up for revisions consistently. Keep both going.`,
+        ]),
+      );
+    } else if (studiedDaysThisWeek >= 3 && studiedDaysThisWeek <= 5) {
+      p.push(
+        pick([
+          `${studiedDaysThisWeek} active days this week — a reasonable start. The exam rewards the students who show up every day, not most days.`,
+          `${studiedDaysThisWeek} out of 7 days. Decent, but there's room to push — even one more day this week compounds over time.`,
+          `${studiedDaysThisWeek} days studied. That's solid but not enough to pull ahead. Try to close out the week stronger.`,
+        ]),
+      );
+    } else if (studiedDaysThisWeek >= 6 && streakCount > 0) {
+      p.push(
+        pick([
+          `${studiedDaysThisWeek} out of 7 days active this week — that kind of consistency is how exams are won.`,
+          `Nearly every day this week. Keep that going.`,
+          `${studiedDaysThisWeek}/7 days. That's elite-level consistency — don't underestimate how much it compounds.`,
+          `${studiedDaysThisWeek} days studied this week. You're showing up every day and it will show on exam day.`,
+          isWeekend
+            ? `Even on the weekend you've kept it up — ${studiedDaysThisWeek} days this week. That's the difference maker.`
+            : `${studiedDaysThisWeek} active days and the week isn't even over. This is the habit that wins exams.`,
+        ]),
+      );
+    } else if (studiedDaysThisWeek >= 6 && streakCount === 0) {
+      p.push(
+        pick([
+          `${studiedDaysThisWeek} active days this week — solid chapter work. Streak is at 0 because it only counts days you completed a revision. Once your completed chapters reach their R1 dates, it will start climbing.`,
+          `${studiedDaysThisWeek}/7 days of activity. Your streak shows 0 because no revisions have come due yet — that changes as your chapters age into their first revision dates. Keep the chapter pace going.`,
+        ]),
+      );
     }
 
     if (inGroup) {
-      p.push(pick([
-        `You're in a study group — friendly competition is one of the best motivators. Use it.`,
-        `Your group can see your streak. Every day you study, it shows.`,
-        `The group leaderboard is live. Someone else is probably studying right now.`,
-        `Study groups work because nobody wants to be the one who fell behind. Use that.`,
-        `Your group is watching the same clock. Let your consistency do the talking.`,
-      ]));
+      p.push(
+        pick([
+          `You're in a study group — friendly competition is one of the best motivators. Use it.`,
+          `Your group can see your streak. Every day you study, it shows.`,
+          `The group leaderboard is live. Someone else is probably studying right now.`,
+          `Study groups work because nobody wants to be the one who fell behind. Use that.`,
+          `Your group is watching the same clock. Let your consistency do the talking.`,
+        ]),
+      );
     }
 
     if (p.length > 0) paras.push(p.join(" "));
@@ -2909,84 +4457,127 @@ function renderCoachTab() {
     const p = [];
 
     if (inRevisionWindow && remaining > 0) {
-      p.push(pick([
-        `Each chapter you can still complete gives you R1, R2, and R3 before the exam. That's still meaningful.`,
-        `Chapters finished in the next ${Math.min(daysToExam || 7, 7)} days can still get 3 revision sessions in. Worth pushing for.`,
-        `Every chapter you finish now still earns you R1 and R2 before exam day. Don't stop.`,
-        `Even inside the revision window, completing chapters matters — each one gets at least 2 revision cycles in.`,
-        `There's still time to finish ${remaining > 5 ? "a few more" : remaining === 1 ? "the last one" : "these last " + remaining} — and every one you complete in the next ${Math.min(daysToExam || 7, 7)} days still gets revised before the exam.`,
-      ]));
+      p.push(
+        pick([
+          `Each chapter you can still complete gives you R1, R2, and R3 before the exam. That's still meaningful.`,
+          `Chapters finished in the next ${Math.min(daysToExam || 7, 7)} days can still get 3 revision sessions in. Worth pushing for.`,
+          `Every chapter you finish now still earns you R1 and R2 before exam day. Don't stop.`,
+          `Even inside the revision window, completing chapters matters — each one gets at least 2 revision cycles in.`,
+          `There's still time to finish ${remaining > 5 ? "a few more" : remaining === 1 ? "the last one" : "these last " + remaining} — and every one you complete in the next ${Math.min(daysToExam || 7, 7)} days still gets revised before the exam.`,
+        ]),
+      );
     } else if (paceRecovering) {
-      p.push(pick([
-        `A comeback from zero is hard. You're doing it. ${safeDaysLeft !== null && safeDaysLeft > 0 ? `You have ${safeDaysLeft} days of real study time left — use the momentum.` : ""}`,
-        `You went from nothing to something this week. That's the hardest part. Now it's about not stopping.`,
-        `Most people don't restart once they've stopped. You did. That matters — now build on it.`,
-        `The comeback is real. ${safeDaysLeft !== null && safeDaysLeft > 0 ? `${safeDaysLeft} days left in your study window. ` : ""}Keep this going and the trajectory changes completely.`,
-        `You've broken the inertia. That's the hardest part of any streak. Don't waste it.`,
-      ]));
-    } else if (paceImproving && zone <= 3) {
-      const daysIfCurrent = last7pace > 0 ? Math.ceil(remaining / last7pace) : null;
-      const newProj = daysIfCurrent ? addDays(today, daysIfCurrent) : null;
-      if (newProj && safeFinishDate && dateKeyToUTC(newProj) <= dateKeyToUTC(safeFinishDate)) {
-        p.push(pick([
-          `At this week's pace you'd finish around ${fmtDate(newProj)} — inside your safe window. Hold this and the exam is yours to win.`,
-          `Keep up this week's pace and you're done by ${fmtDate(newProj)}, well before the safe deadline. The work is paying off.`,
-          `${fmtDate(newProj)} — that's your finish date if this week's pace holds. That's a strong position to be in.`,
-        ]));
+      if (!onTrackForSafe && paceNeededForSafe !== null) {
+        // Came back but still behind needed pace — praise the return, name the gap
+        p.push(
+          pick([
+            `Good to see you back${name ? ", " + name : ""}. You went from nothing to something this week — that's real. But the gap is still there: ${effectivePace.toFixed(1)}/day right now, ${paceNeededForSafe.toFixed(1)}/day needed. The comeback only counts if the pace follows.`,
+            `You restarted. That's the hardest part and you did it. Now the honest picture: ${paceNeededForSafe.toFixed(1)} chapters/day needed, you're at ${effectivePace.toFixed(1)}. ${safeDaysLeft !== null && safeDaysLeft > 0 ? `${safeDaysLeft} days left — ` : ""}close the gap starting today.`,
+            `The return is real${name ? ", " + name : ""}. Most people don't come back once they stop — you did. But ${remaining} chapters in ${safeDaysLeft !== null && safeDaysLeft > 0 ? safeDaysLeft + " days" : "the time left"} means this week's pace needs to be the floor, not the ceiling.`,
+            `You broke the inertia. That matters. Now be honest with yourself: ${effectivePace.toFixed(1)}/day won't get you there — you need ${paceNeededForSafe.toFixed(1)}. You've done the hard part of starting. Now do the harder part of accelerating.`,
+          ]),
+        );
       } else {
-        p.push(pick([
-          `Your pace is moving in the right direction. Keep pushing — the gap is closing.`,
-          `The trend is your friend right now. Don't let it flatten out.`,
-          `Pace up, trajectory improving. Stay focused and the math starts working for you.`,
-        ]));
+        // Came back and already on track — full celebration
+        p.push(
+          pick([
+            `A comeback from zero is hard. You're doing it. ${safeDaysLeft !== null && safeDaysLeft > 0 ? `You have ${safeDaysLeft} days of real study time left — use the momentum.` : ""}`,
+            `You went from nothing to something this week. That's the hardest part. Now it's about not stopping.`,
+            `Most people don't restart once they've stopped. You did. That matters — now build on it.`,
+            `The comeback is real. ${safeDaysLeft !== null && safeDaysLeft > 0 ? `${safeDaysLeft} days left in your study window. ` : ""}Keep this going and the trajectory changes completely.`,
+            `You've broken the inertia. That's the hardest part of any streak. Don't waste it.`,
+          ]),
+        );
+      }
+    } else if (paceImproving && zone <= 3) {
+      const daysIfCurrent =
+        last7pace > 0 ? Math.ceil(remaining / last7pace) : null;
+      const newProj = daysIfCurrent ? addDays(today, daysIfCurrent) : null;
+      if (
+        newProj &&
+        safeFinishDate &&
+        dateKeyToUTC(newProj) <= dateKeyToUTC(safeFinishDate)
+      ) {
+        p.push(
+          pick([
+            `At this week's pace you'd finish around ${fmtDate(newProj)} — inside your safe window. Hold this and the exam is yours to win.`,
+            `Keep up this week's pace and you're done by ${fmtDate(newProj)}, well before the safe deadline. The work is paying off.`,
+            `${fmtDate(newProj)} — that's your finish date if this week's pace holds. That's a strong position to be in.`,
+          ]),
+        );
+      } else {
+        p.push(
+          pick([
+            `Your pace is moving in the right direction. Keep pushing — the gap is closing.`,
+            `The trend is your friend right now. Don't let it flatten out.`,
+            `Pace up, trajectory improving. Stay focused and the math starts working for you.`,
+          ]),
+        );
       }
     } else if (zone === 1 && projBeforeSafe && streakCount >= 3) {
-      p.push(pick(
-        streakTier >= 3 ? [
-          `${streakCount} days straight — that's a real habit now, not just a streak. Protect it.`,
-          `A ${streakCount}-day streak means you've built something that actually works. Don't let a single lazy day undo it.`,
-          `${streakCount} consecutive days. At this point the streak itself becomes motivation. Keep it alive.`,
-        ] : streakTier === 2 ? [
-          `${streakCount} days in a row — you're past the hard part of building a habit. Now it's just maintenance.`,
-          `A ${streakCount}-day streak is where consistency starts compounding. Don't give it a reason to break.`,
-          `${streakCount} days straight. That kind of consistency is what actually wins exams.`,
-        ] : [
-          `A ${streakCount}-day streak is real momentum. Don't give it a reason to break.`,
-          `${streakCount} days straight. That kind of consistency is what actually wins exams.`,
-          `Small streaks grow into big ones. Keep this one alive.`,
-        ]
-      ));
+      p.push(
+        pick(
+          streakTier >= 3
+            ? [
+                `${streakCount} days straight — that's a real habit now, not just a streak. Protect it.`,
+                `A ${streakCount}-day streak means you've built something that actually works. Don't let a single lazy day undo it.`,
+                `${streakCount} consecutive days. At this point the streak itself becomes motivation. Keep it alive.`,
+              ]
+            : streakTier === 2
+              ? [
+                  `${streakCount} days in a row — you're past the hard part of building a habit. Now it's just maintenance.`,
+                  `A ${streakCount}-day streak is where consistency starts compounding. Don't give it a reason to break.`,
+                  `${streakCount} days straight. That kind of consistency is what actually wins exams.`,
+                ]
+              : [
+                  `A ${streakCount}-day streak is real momentum. Don't give it a reason to break.`,
+                  `${streakCount} days straight. That kind of consistency is what actually wins exams.`,
+                  `Small streaks grow into big ones. Keep this one alive.`,
+                ],
+        ),
+      );
     } else if (zone === 2 && safeDaysLeft !== null) {
-      p.push(pick([
-        `${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} of real study time left before the revision window opens. Make each one count.`,
-        `You have ${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} left in your study window. Use them well.`,
-        `${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} to the revision window. Every chapter you finish now gets the full cycle.`,
-        `The study window has ${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} in it. Chapters completed in that time get all four revision rounds.`,
-        isFri ? `Going into the weekend with ${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} left — use at least part of it.` :
-        isMon ? `${safeDaysLeft} days left and a fresh week ahead. Don't let Monday be a slow start.` :
-        `${safeDaysLeft} days. Not as many as it sounds. Use each one deliberately.`,
-      ]));
+      p.push(
+        pick([
+          `${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} of real study time left before the revision window opens. Make each one count.`,
+          `You have ${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} left in your study window. Use them well.`,
+          `${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} to the revision window. Every chapter you finish now gets the full cycle.`,
+          `The study window has ${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} in it. Chapters completed in that time get all four revision rounds.`,
+          isFri
+            ? `Going into the weekend with ${safeDaysLeft} day${safeDaysLeft !== 1 ? "s" : ""} left — use at least part of it.`
+            : isMon
+              ? `${safeDaysLeft} days left and a fresh week ahead. Don't let Monday be a slow start.`
+              : `${safeDaysLeft} days. Not as many as it sounds. Use each one deliberately.`,
+        ]),
+      );
     } else if (zone === 3 && remaining > 0) {
-      p.push(pick([
-        `Focus on subjects you can finish completely rather than touching everything lightly. Depth beats breadth here.`,
-        `Better to fully complete 2 subjects with good revision than half-finish 5.`,
-        `Pick the highest-weightage chapters and finish those completely. Partial coverage of everything is worth less than full coverage of what matters most.`,
-        `In the time you have, prioritise finishing — a completed chapter with R1 is more valuable than three started ones.`,
-        `Narrow the focus. Fewer subjects, done properly, beats spreading thin across all of them.`,
-      ]));
+      p.push(
+        pick([
+          `Focus on subjects you can finish completely rather than touching everything lightly. Depth beats breadth here.`,
+          `Better to fully complete 2 subjects with good revision than half-finish 5.`,
+          `Pick the highest-weightage chapters and finish those completely. Partial coverage of everything is worth less than full coverage of what matters most.`,
+          `In the time you have, prioritise finishing — a completed chapter with R1 is more valuable than three started ones.`,
+          `Narrow the focus. Fewer subjects, done properly, beats spreading thin across all of them.`,
+        ]),
+      );
     } else if (remaining === 0) {
-      p.push(pick([
-        `Every revision you do now is memory you're locking in for exam day.`,
-        `The studying is done. Now it's just about retention.`,
-        `Each revision session from here is compounding what you already know. Keep the chain clean.`,
-        `You're in the best possible position: syllabus done, revision chain running. Stay on top of it.`,
-        streakTier >= 2 ? `${streakCount} days of discipline has brought you here. Carry it through to exam day.` :
-        `All that's left is revision. Do it daily and exam day looks after itself.`,
-      ]));
+      p.push(
+        pick([
+          `Every revision you do now is memory you're locking in for exam day.`,
+          `The studying is done. Now it's just about retention.`,
+          `Each revision session from here is compounding what you already know. Keep the chain clean.`,
+          `You're in the best possible position: syllabus done, revision chain running. Stay on top of it.`,
+          streakTier >= 2
+            ? `${streakCount} days of discipline has brought you here. Carry it through to exam day.`
+            : `All that's left is revision. Do it daily and exam day looks after itself.`,
+        ]),
+      );
     }
 
     if (chapsLosingR4 > 0 && !inRevisionWindow && remaining > 0) {
-      p.push(`${chapsLosingR4} completed chapter${chapsLosingR4 !== 1 ? "s" : ""} will miss R4 before your exam — R1 through R3 still count, so they're not wasted.`);
+      p.push(
+        `${chapsLosingR4} completed chapter${chapsLosingR4 !== 1 ? "s" : ""} will miss R4 before your exam — R1 through R3 still count, so they're not wasted.`,
+      );
     }
 
     if (p.length > 0) paras.push(p.join(" "));
@@ -2995,84 +4586,113 @@ function renderCoachTab() {
   // ── CLOSER: one crisp line ──
   {
     let closer = "";
-    if (paceRecovering) closer = pick([
-      `This is what a turnaround looks like. Keep going.`,
-      `You started. That's already more than most people manage.`,
-      `Momentum is fragile at first. Protect it today.`,
-      `The hardest part of a comeback is not stopping again. You've got this.`,
-      isMon ? `New week, new streak. Make it count.` : isFri ? `Finish the week strong — don't let Friday be a rest day yet.` : `Keep the streak alive. One day at a time.`,
-    ]);
-    else if (paceImproving && onTrackForSafe) closer = pick([
-      `You're improving and on track. Don't let up.`,
-      `The numbers are moving your way. Stay with it.`,
-      `Everything's going in the right direction. The only job now is to not stop.`,
-      `Pace up, on track, exam in sight. This is what good preparation looks like.`,
-      streakTier >= 2 ? `${streakCount} days and accelerating. That's the combination that wins.` : `Keep building. The trend is your friend right now.`,
-    ]);
-    else if (paceSlipping && zone === 1) closer = pick([
-      `The early weeks are deceptively forgiving. Don't mistake that for safety.`,
-      `A dip now is fixable. A dip in zone 2 isn't. Close it today.`,
-      `Zone 1 feels comfortable. That's the trap. Fix the pace before it becomes a pattern.`,
-      `You have time to correct this — but only if you start today, not next week.`,
-      isMon ? `New week, clean slate. But the gap from last week doesn't reset. Address it now.` : `The slip is small. Keep it that way by acting today.`,
-    ]);
-    else if (zone === 1 && onTrackForSafe) closer = pick([
-      `You're doing the right things. Keep going.`,
-      `This is how exams are won — one chapter at a time, day after day.`,
-      `Solid. Don't overthink it.`,
-      streakTier >= 3 ? `${streakCount} days. You've turned this into a discipline, not just a habit. See it through.` :
-      streakTier === 2 ? `${streakCount}-day streak and on track. That's the sweet spot. Don't break it.` :
-      streakTier === 1 ? `Small streak, solid numbers. Build on both.` :
-      isMon ? `Good start to the week. Let's see you finish it the same way.` :
-      isFri ? `Strong week. Rest tonight, but don't let it bleed into Sunday.` :
-      `Consistent effort beats occasional heroics every time. Keep it up.`,
-    ]);
-    else if (zone === 1 && !onTrackForSafe) closer = pick([
-      `You have time — but only if you use it. Start closing that gap today.`,
-      `Early days are the easiest to waste. Don't.`,
-      `The runway is long, but it won't feel that way in a month.`,
-      `Zone 1 is a gift. Don't hand it back by treating every day as optional.`,
-      isMon ? `Start the week with intent. What you do today sets the tone for all seven days.` :
-      isWeekend ? `Weekends are where gaps open up. Don't let this one be wasted.` :
-      `Every comfortable day now is a stressed day later. Get ahead of it.`,
-    ]);
-    else if (zone === 2) closer = pick([
-      `The window is real. Don't let urgency become panic — just move.`,
-      `This is the part that separates prepared from unprepared. Stay in it.`,
-      `Today matters more than it feels like it does.`,
-      `Zone 2 students who keep moving make it. Those who freeze, don't. Keep moving.`,
-      isFri ? `Don't let the weekend undo the week. Keep the momentum through Saturday at least.` :
-      isMon ? `The week ahead is your best chance to change the trajectory. Use every day of it.` :
-      `Urgency without panic. That's the mode to be in right now.`,
-      `The chapters you do today directly protect your revision cycles. Make them count.`,
-    ]);
-    else if (remaining === 0) closer = pick([
-      `You've done the hard part. See it through.`,
-      `Back yourself now.`,
-      `The syllabus is done. Trust your preparation and stay sharp on revisions.`,
-      `Revision from here, every day. That's it. That's the whole plan.`,
-      streakTier >= 2 ? `${streakCount} days of work brought you here. Don't stop in the final stretch.` : `The finish line is close. Don't let your guard down.`,
-    ]);
-    else if (zone === 3) closer = pick([
-      `Hard and impossible aren't the same thing. Start with one chapter today.`,
-      `The situation is what it is. Work with what you have.`,
-      `You still have time to make this count. Use it.`,
-      `Don't let the size of the deficit stop you from reducing it. One chapter is one chapter.`,
-      `The gap looks big. It gets smaller one chapter at a time. Start now.`,
-      `Late prep beats no prep. Every day you study from here changes the outcome.`,
-    ]);
+    if (paceRecovering)
+      closer = pick([
+        `This is what a turnaround looks like. Keep going.`,
+        `You started. That's already more than most people manage.`,
+        `Momentum is fragile at first. Protect it today.`,
+        `The hardest part of a comeback is not stopping again. You've got this.`,
+        isMon
+          ? `New week, new streak. Make it count.`
+          : isFri
+            ? `Finish the week strong — don't let Friday be a rest day yet.`
+            : `Keep the streak alive. One day at a time.`,
+      ]);
+    else if (paceImproving && onTrackForSafe)
+      closer = pick([
+        `You're improving and on track. Don't let up.`,
+        `The numbers are moving your way. Stay with it.`,
+        `Everything's going in the right direction. The only job now is to not stop.`,
+        `Pace up, on track, exam in sight. This is what good preparation looks like.`,
+        streakTier >= 2
+          ? `${streakCount} days and accelerating. That's the combination that wins.`
+          : `Keep building. The trend is your friend right now.`,
+      ]);
+    else if (paceSlipping && zone === 1)
+      closer = pick([
+        `The early weeks are deceptively forgiving. Don't mistake that for safety.`,
+        `A dip now is fixable. A dip in zone 2 isn't. Close it today.`,
+        `Zone 1 feels comfortable. That's the trap. Fix the pace before it becomes a pattern.`,
+        `You have time to correct this — but only if you start today, not next week.`,
+        isMon
+          ? `New week, clean slate. But the gap from last week doesn't reset. Address it now.`
+          : `The slip is small. Keep it that way by acting today.`,
+      ]);
+    else if (zone === 1 && onTrackForSafe)
+      closer = pick([
+        `You're doing the right things. Keep going.`,
+        `This is how exams are won — one chapter at a time, day after day.`,
+        `Solid. Don't overthink it.`,
+        streakTier >= 3
+          ? `${streakCount} days. You've turned this into a discipline, not just a habit. See it through.`
+          : streakTier === 2
+            ? `${streakCount}-day streak and on track. That's the sweet spot. Don't break it.`
+            : streakTier === 1
+              ? `Small streak, solid numbers. Build on both.`
+              : isMon
+                ? `Good start to the week. Let's see you finish it the same way.`
+                : isFri
+                  ? `Strong week. Rest tonight, but don't let it bleed into Sunday.`
+                  : `Consistent effort beats occasional heroics every time. Keep it up.`,
+      ]);
+    else if (zone === 1 && !onTrackForSafe)
+      closer = pick([
+        `You have time — but only if you use it. Start closing that gap today.`,
+        `Early days are the easiest to waste. Don't.`,
+        `The runway is long, but it won't feel that way in a month.`,
+        `Zone 1 is a gift. Don't hand it back by treating every day as optional.`,
+        isMon
+          ? `Start the week with intent. What you do today sets the tone for all seven days.`
+          : isWeekend
+            ? `Weekends are where gaps open up. Don't let this one be wasted.`
+            : `Every comfortable day now is a stressed day later. Get ahead of it.`,
+      ]);
+    else if (zone === 2)
+      closer = pick([
+        `The window is real. Don't let urgency become panic — just move.`,
+        `This is the part that separates prepared from unprepared. Stay in it.`,
+        `Today matters more than it feels like it does.`,
+        `Zone 2 students who keep moving make it. Those who freeze, don't. Keep moving.`,
+        isFri
+          ? `Don't let the weekend undo the week. Keep the momentum through Saturday at least.`
+          : isMon
+            ? `The week ahead is your best chance to change the trajectory. Use every day of it.`
+            : `Urgency without panic. That's the mode to be in right now.`,
+        `The chapters you do today directly protect your revision cycles. Make them count.`,
+      ]);
+    else if (remaining === 0)
+      closer = pick([
+        `You've done the hard part. See it through.`,
+        `Back yourself now.`,
+        `The syllabus is done. Trust your preparation and stay sharp on revisions.`,
+        `Revision from here, every day. That's it. That's the whole plan.`,
+        streakTier >= 2
+          ? `${streakCount} days of work brought you here. Don't stop in the final stretch.`
+          : `The finish line is close. Don't let your guard down.`,
+      ]);
+    else if (zone === 3)
+      closer = pick([
+        `Hard and impossible aren't the same thing. Start with one chapter today.`,
+        `The situation is what it is. Work with what you have.`,
+        `You still have time to make this count. Use it.`,
+        `Don't let the size of the deficit stop you from reducing it. One chapter is one chapter.`,
+        `The gap looks big. It gets smaller one chapter at a time. Start now.`,
+        `Late prep beats no prep. Every day you study from here changes the outcome.`,
+      ]);
     if (closer) paras.push(closer);
   }
 
   // ── RENDER ──
   const F = _PC.font;
-  const bodyHtml = paras.map((p, i) => {
-    const isCloser = i === paras.length - 1;
-    const size = isCloser ? "0.95rem" : "1.02rem";
-    const color = isCloser ? _PC.text2 : _PC.text;
-    const mb = i < paras.length - 1 ? "18px" : "0";
-    return `<p style="font-size:${size};color:${color};line-height:1.85;font-family:${F};margin:0 0 ${mb} 0">${p}</p>`;
-  }).join("");
+  const bodyHtml = paras
+    .map((p, i) => {
+      const isCloser = i === paras.length - 1;
+      const size = isCloser ? "0.95rem" : "1.02rem";
+      const color = isCloser ? _PC.text2 : _PC.text;
+      const mb = i < paras.length - 1 ? "18px" : "0";
+      return `<p style="font-size:${size};color:${color};line-height:1.85;font-family:${F};margin:0 0 ${mb} 0">${p}</p>`;
+    })
+    .join("");
 
   block.innerHTML = `
     <div style="background:linear-gradient(135deg,rgba(194,118,42,0.07),rgba(168,94,26,0.03));border:1px solid rgba(194,118,42,0.18);border-top:3px solid var(--indigo2);border-radius:16px;padding:20px 18px;box-shadow:0 4px 24px rgba(0,0,0,0.4)">
@@ -3080,7 +4700,7 @@ function renderCoachTab() {
         <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--indigo2),var(--kumkum));display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;box-shadow:0 0 12px rgba(194,118,42,0.3)">🎓</div>
         <div>
           <div style="font-size:0.78rem;font-weight:700;color:var(--indigo);font-family:${F};letter-spacing:0.04em">COACH</div>
-          <div style="font-size:0.62rem;color:var(--text3);font-family:${F}">${name ? name + "'s" : "Your"} personalised assessment</div>
+          <div style="font-size:0.72rem;color:var(--text2);font-family:${F}">${name ? name + "'s" : "Your"} personalised assessment</div>
         </div>
       </div>
       ${bodyHtml}
@@ -3089,23 +4709,6 @@ function renderCoachTab() {
 }
 
 // ── Save deadline from coach tab ──
-function _saveDeadlineFromCoach() {
-  const inp = document.getElementById("coach-deadline-input");
-  if (!inp || !inp.value) {
-    const err = document.getElementById("coach-deadline-err");
-    if (err) err.textContent = "Please pick a date.";
-    return;
-  }
-  const errMsg = _validateDeadline(inp.value, profile.examDate);
-  if (errMsg) {
-    const err = document.getElementById("coach-deadline-err");
-    if (err) err.textContent = errMsg;
-    return;
-  }
-  profile.deadline = inp.value;
-  localStorage.setItem("st_profile", JSON.stringify(profile));
-  renderCoachTab();
-}
 
 function _renderDeadlineBanner() {
   // Find or create the banner element before prog-readiness-block
@@ -3119,6 +4722,18 @@ function _renderDeadlineBanner() {
   }
 
   const today = todayStr();
+
+  // Hide banner entirely when exam is within 15 days — deadline no longer applies
+  const _daysToExamNow = profile.examDate
+    ? Math.round(
+        (dateKeyToUTC(profile.examDate) - dateKeyToUTC(today)) / 86400000,
+      )
+    : null;
+  if (_daysToExamNow !== null && _daysToExamNow <= 15 && !profile.deadline) {
+    banner.innerHTML = `<div class="prog-section" style="background:${_PC.bg};border:1px solid ${_PC.border};border-radius:16px;padding:14px 18px;margin-bottom:14px;box-shadow:0 4px 24px rgba(0,0,0,0.5)"><div style="font-size:0.73rem;color:${_PC.text2};font-family:${_PC.font};line-height:1.5">⏳ 15 or fewer days to exam — the window to set a study deadline has passed. Focus on revisions and what's left.
+</div></div>`;
+    return;
+  }
 
   if (profile.deadline) {
     // Show countdown banner
@@ -3139,11 +4754,11 @@ function _renderDeadlineBanner() {
     const color = dLeft <= 7 ? _PC.red : dLeft <= 20 ? _PC.yellow : _PC.green;
     banner.innerHTML = `<div class="prog-section" style="background:${_PC.bg};border:1px solid ${_PC.border};border-top:3px solid ${color};border-radius:16px;padding:16px 18px;margin-bottom:14px;box-shadow:0 4px 24px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div>
-        <div style="font-size:0.63rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:${color};font-family:${_PC.font};margin-bottom:4px">🎯 Study Deadline</div>
+        <div style="font-size:0.72rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:${color};font-family:${_PC.font};margin-bottom:4px">🎯 Study Deadline</div>
         <div style="font-size:1.6rem;font-weight:900;color:${color};font-family:${_PC.font};line-height:1;text-shadow:0 0 16px ${color}66">${dLeft} <span style="font-size:0.9rem">days left</span></div>
         <div style="font-size:0.68rem;color:${_PC.text2};font-family:${_PC.font};margin-top:4px">Finish by ${fmtDate(profile.deadline)}${examLeft !== null ? ` &nbsp;·&nbsp; Exam in ${examLeft}d` : ""}</div>
       </div>
-      <button onclick="_clearDeadline()" style="background:transparent;border:1px solid ${_PC.border};border-radius:8px;padding:6px 12px;font-size:0.63rem;font-weight:700;color:${_PC.text3};cursor:pointer;font-family:${_PC.font}">Change</button>
+      <button onclick="_clearDeadline()" style="background:transparent;border:1px solid ${_PC.border};border-radius:8px;padding:6px 12px;font-size:0.72rem;font-weight:700;color:${_PC.text3};cursor:pointer;font-family:${_PC.font}">Change</button>
     </div>`;
     return;
   }
@@ -3160,10 +4775,31 @@ function _renderDeadlineBanner() {
     profile.examDate,
   );
   banner.innerHTML = `<div class="prog-section" style="background:${_PC.bg};border:2px solid ${_PC.indigo}55;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 24px rgba(0,0,0,0.5)">
-    <div style="font-size:0.65rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:${_PC.indigo};font-family:${_PC.font};margin-bottom:6px">🎯 Set Your Study Deadline</div>
+    <div style="font-size:0.75rem;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:${_PC.indigo};font-family:${_PC.font};margin-bottom:6px">🎯 Set Your Study Deadline</div>
     <div style="font-size:0.78rem;color:${_PC.text2};font-family:${_PC.font};margin-bottom:4px;line-height:1.5">When do you want to finish your full syllabus? All pace calculations use this date.</div>
     <div style="font-size:0.68rem;color:${_PC.text3};font-family:${_PC.font};margin-bottom:6px">Valid range: <span style="color:${_PC.text2}">${minLabel}</span> → <span style="color:${_PC.text2}">${maxLabel}</span></div>
-    <div style="font-size:0.7rem;color:${_PC.purple};font-family:${_PC.font};margin-bottom:14px;line-height:1.5">💡 Suggested: <strong style="color:${_PC.text}">${fmtDate(addDays(profile.examDate, -35))}</strong> — finishing 35 days before your exam gives you the full revision cycle (R1→R4 all complete).</div>
+    ${(() => {
+      const _bps = _computePaceState();
+      const _bep = _bps ? _bps.effectivePace : 0;
+      const _brem = _bps ? _bps.remaining : 0;
+      const _bMin = addDays(profile.examDate, -60);
+      const _bMax = addDays(profile.examDate, -10);
+      const _sug = (() => {
+        if (_bep <= 0 || _brem === 0) return null;
+        const _bSlip = _bps ? _bps.paceSlipping : false;
+        const _bImp = _bps ? _bps.paceImproving : false;
+        const _buf = _bSlip ? 10 : _bImp ? 3 : 5;
+        const _bproj = addDays(today, Math.ceil(_brem / _bep) + _buf);
+        if (dateKeyToUTC(_bproj) > dateKeyToUTC(_bMax)) return null;
+        if (dateKeyToUTC(_bproj) < dateKeyToUTC(_bMin)) return _bMin;
+        return _bproj;
+      })();
+      return _sug
+        ? `<div style="font-size:0.7rem;color:${_PC.purple};font-family:${_PC.font};margin-bottom:14px;line-height:1.5">💡 Suggested: <strong style="color:${_PC.text}">${fmtDate(_sug)}</strong> — based on your current pace and chapters remaining.</div>`
+        : _bep > 0
+          ? `<div style="font-size:0.7rem;color:${_PC.orange};font-family:${_PC.font};margin-bottom:14px;line-height:1.5">⚠️ At your current pace a suggested deadline can't be calculated — you're close to the margin. Set a target date manually and use it to push your daily rate up slightly.</div>`
+          : ``;
+    })()}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
       <input type="date" id="prog-deadline-input" min="${minDate}" max="${maxDate}" style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:8px;padding:9px 12px;color:${_PC.text};font-family:${_PC.font};font-size:0.82rem;flex:1;min-width:140px;outline:none" />
       <button onclick="_saveDeadlineFromProgress()" style="background:${_PC.indigo};border:none;border-radius:8px;padding:9px 18px;font-size:0.78rem;font-weight:800;color:#fff;cursor:pointer;font-family:${_PC.font};white-space:nowrap">Set Deadline</button>
@@ -3187,7 +4823,8 @@ function _saveDeadlineFromProgress() {
   profile.deadline = inp.value;
   localStorage.setItem("st_profile", JSON.stringify(profile));
   renderProgress();
-  if (document.getElementById("tab-coach").classList.contains("active")) renderCoachTab();
+  if (document.getElementById("tab-coach").classList.contains("active"))
+    renderCoachTab();
 }
 
 function _clearDeadline() {
@@ -3196,7 +4833,8 @@ function _clearDeadline() {
   const banner = document.getElementById("prog-deadline-banner");
   if (banner) banner.remove();
   renderProgress();
-  if (document.getElementById("tab-coach").classList.contains("active")) renderCoachTab();
+  if (document.getElementById("tab-coach").classList.contains("active"))
+    renderCoachTab();
 }
 
 // ── SHARED UTIL ──
@@ -3340,8 +4978,9 @@ function _progHeader(icon, title, accentColor, rightHtml = "") {
 }
 
 function _bar(pct, color, height = 7) {
+  const w = pct === null || pct === undefined ? 0 : pct;
   return `<div style="background:${_PC.bg4};border-radius:99px;height:${height}px;overflow:hidden;border:1px solid ${_PC.border};position:relative">
-    <div class="prog-bar-fill" style="width:${pct}%;height:100%;background:${color};border-radius:99px;box-shadow:0 0 8px ${color}55;position:relative">
+    <div class="prog-bar-fill" style="width:${w}%;height:100%;background:${color};border-radius:99px;box-shadow:0 0 8px ${color}55;position:relative">
       <div class="prog-shimmer-bar"></div>
     </div>
   </div>`;
@@ -3381,6 +5020,25 @@ function renderReadiness() {
   if (!block) return;
   _injectProgressCSS();
 
+  // Post-exam gate
+  if (profile && profile.examDate) {
+    const _examMs = dateKeyToUTC(profile.examDate);
+    const _todayMs = dateKeyToUTC(todayStr());
+    if (_todayMs >= _examMs) {
+      block.innerHTML = _progSection(
+        _progHeader("🎯", "Exam Readiness", _PC.indigo) +
+          `<div style="text-align:center;padding:24px 16px">
+            <div style="font-size:1.8rem;margin-bottom:10px">🎓</div>
+            <div style="font-size:0.95rem;color:${_PC.text2};font-family:${_PC.font};font-style:italic;line-height:1.7">
+              Your exam is done. Your readiness score was your preparation — it served its purpose.
+            </div>
+          </div>`,
+        `border-top:3px solid ${_PC.indigo};`,
+      );
+      return;
+    }
+  }
+
   const syllabusChapters = chapters.filter((c) => !c.isCustom);
   const syllabusTotal = _syllabusGrandTotal() || syllabusChapters.length;
   if (syllabusTotal === 0) {
@@ -3403,7 +5061,9 @@ function renderReadiness() {
     if (c.status !== "Completed") return false;
     const refDate = c.completedDate || c.dateAdded;
     if (!refDate) return false;
-    return Math.round((dateKeyToUTC(today) - dateKeyToUTC(refDate)) / 86400000) > 30;
+    return (
+      Math.round((dateKeyToUTC(today) - dateKeyToUTC(refDate)) / 86400000) > 30
+    );
   });
   const chaptersWith4 = chaptersEligibleForR4.filter((c) =>
     [1, 3, 7, 30].every((n) =>
@@ -3412,7 +5072,11 @@ function renderReadiness() {
       ),
     ),
   ).length;
-  const consistencyScore = chaptersEligibleForR4.length > 0 ? (chaptersWith4 / chaptersEligibleForR4.length) * 25 : 0;
+  // Consistency: only chapters older than 30 days are eligible (enough time for full R4 cycle)
+  const consistencyScore =
+    chaptersEligibleForR4.length > 0
+      ? (chaptersWith4 / chaptersEligibleForR4.length) * 25
+      : 0;
 
   // Balance across ALL syllabus subjects, not just user-added ones
   const syllabusSubjectTotals = {};
@@ -3484,9 +5148,10 @@ function renderReadiness() {
           : _PC.red;
   const donePct =
     syllabusTotal > 0 ? Math.round((completed / syllabusTotal) * 100) : 0;
-  const revPct = chaptersEligibleForR4.length > 0
-    ? Math.round((chaptersWith4 / chaptersEligibleForR4.length) * 100)
-    : null;
+  const revPct =
+    chaptersEligibleForR4.length > 0
+      ? Math.round((chaptersWith4 / chaptersEligibleForR4.length) * 100)
+      : null;
 
   // Exam countdown badge
   let countdownHtml = "";
@@ -3510,24 +5175,28 @@ function renderReadiness() {
         ${_ringChart(donePct, ringColor, 112, 13)}
         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
           <div style="font-size:1.8rem;font-weight:900;color:${ringColor};font-family:${_PC.font};line-height:1;text-shadow:0 0 20px ${ringColor}88">${readiness}</div>
-          <div style="font-size:0.48rem;font-weight:800;letter-spacing:0.1em;color:${_PC.text3};text-transform:uppercase;font-family:${_PC.font}">/ 100</div>
+          <div style="font-size:0.65rem;font-weight:800;letter-spacing:0.1em;color:${_PC.text2};text-transform:uppercase;font-family:${_PC.font}">/ 100</div>
         </div>
       </div>
       <div style="flex:1;min-width:130px">
         <div style="font-size:1.4rem;font-weight:900;letter-spacing:0.06em;color:${gradeColor};font-family:${_PC.font};text-shadow:0 0 16px ${gradeColor}55;margin-bottom:2px">${grade}</div>
         <div style="font-size:0.7rem;color:${_PC.text2};margin-bottom:12px;font-family:${_PC.font}">${completed} of ${syllabusTotal} syllabus chapters done</div>
         <div style="margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;font-size:0.63rem;color:${_PC.text3};margin-bottom:4px;font-family:${_PC.font}"><span>Chapters done (60 pts)</span><span style="color:${_PC.text2}">${donePct}%</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:${_PC.text2};margin-bottom:4px;font-family:${_PC.font}"><span>Chapters done (60 pts)</span><span>${donePct}%</span></div>
           ${_bar(donePct, ringColor)}
         </div>
-        <div>
-          <div style="display:flex;justify-content:space-between;font-size:0.63rem;color:${_PC.text3};margin-bottom:4px;font-family:${_PC.font}"><span>All 4 revisions done (25 pts)</span><span style="color:${_PC.text2}">${revPct === null ? "—" : revPct + "%"}</span></div>
+        <div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:${_PC.text2};margin-bottom:4px;font-family:${_PC.font}"><span>All 4 revisions done (25 pts)</span><span>${revPct === null ? "—" : revPct + "%"}</span></div>
           ${revPct !== null ? _bar(revPct, _PC.purple) : _bar(0, _PC.text3)}
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:${_PC.text2};margin-bottom:4px;font-family:${_PC.font}"><span>Subject balance (15 pts)</span><span>${Math.round((balanceScore / 15) * 100)}%</span></div>
+          ${_bar(Math.round((balanceScore / 15) * 100), _PC.green)}
         </div>
       </div>
     </div>
-    <div style="margin-top:12px;background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:8px;padding:9px 12px;font-size:0.65rem;color:${_PC.text3};font-family:${_PC.font};line-height:1.6">
-      Score = chapters done (max 60) + all-4-revisions rate (max 25) + subject balance (max 15)
+    <div style="margin-top:12px;background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:8px;padding:9px 12px;font-size:0.72rem;color:${_PC.text2};font-family:${_PC.font};line-height:1.6">
+      Score = chapters done (max 60) + all 4 revisions done (max 25) + subject balance (max 15)
     </div>
   `,
     `border-top:3px solid ${_PC.indigo};animation:progGlow 3s ease-in-out infinite;`,
@@ -3539,40 +5208,76 @@ function renderPace() {
   const block = document.getElementById("prog-pace-block");
   if (!block) return;
   const ps = _computePaceState();
-  if (!ps) { block.innerHTML = ""; return; }
+  if (!ps) {
+    block.innerHTML = "";
+    return;
+  }
 
   const {
-    today, completed, remaining, safeFinishDate, safeDaysLeft,
-    inSilentZone, inRevisionWindow, isEmergency, nearZoneDrop,
-    effectivePace, paceNeededForSafe, onTrackForSafe,
-    projectedFinish, paceImproving, paceSlipping, paceRecovering,
+    today,
+    completed,
+    remaining,
+    safeFinishDate,
+    safeDaysLeft,
+    daysToExam,
+    inSilentZone,
+    inRevisionWindow,
+    isEmergency,
+    nearZoneDrop,
+    effectivePace,
+    paceNeededForSafe,
+    onTrackForSafe,
+    projectedFinish,
+    paceImproving,
+    paceSlipping,
+    paceRecovering,
+    studyDaysCount,
   } = ps;
 
-  // ── Silent zone: ≤5 days to exam — no numbers, calm message ──
-  if (inSilentZone) {
+  // ── Post-exam: exam date has passed — no pace numbers shown ──
+  if (daysToExam <= 0) {
     block.innerHTML = _progSection(
       `${_progHeader("🎓", "Pace Tracker", _PC.indigo)}
       <div style="font-size:0.85rem;color:${_PC.text2};line-height:1.8;font-family:${_PC.font}">
-        You're in the final stretch. Stop counting chapters — focus on what you know.
-        Rest, revise, and show up sharp.
+        The exam is done. No more pace targets — you put the work in.
       </div>`,
-      `border-top:3px solid ${_PC.indigo};`
+      `border-top:3px solid ${_PC.indigo};`,
+    );
+    return;
+  }
+
+  // ── Silent zone: ≤5 days to exam — no numbers, calm message ──
+  if (inSilentZone) {
+    const _silentMsg =
+      remaining > 0
+        ? `${remaining} chapter${remaining !== 1 ? "s" : ""} still to go. In the time left, complete what you can and revise everything you have. Every chapter you finish now still gets at least one revision before exam day.`
+        : `Syllabus complete. Focus entirely on revisions — work through your scheduled sessions and show up sharp.`;
+    block.innerHTML = _progSection(
+      `${_progHeader("🎓", "Pace Tracker", _PC.indigo)}
+      <div style="font-size:0.85rem;color:${_PC.text2};line-height:1.8;font-family:${_PC.font}">
+        ${_silentMsg}
+      </div>`,
+      `border-top:3px solid ${_PC.indigo};`,
     );
     return;
   }
 
   // ── Revision window: safe window closed — redirect to revisions ──
   if (inRevisionWindow && !isEmergency) {
+    const _revMsg =
+      remaining > 0
+        ? `The safe chapter-completion window has closed — new chapters started now won't complete their full revision cycle. But don't stop.<br><br>
+        <span style="color:${_PC.text};font-weight:700">Keep completing chapters AND revising</span>
+        — every chapter you finish in the time left still earns at least 2 revision sessions before exam day. Prioritise by weightage.`
+        : `The chapter-completion window has closed. Syllabus is done.<br><br>
+        <span style="color:${_PC.text};font-weight:700">Focus entirely on revisions</span>
+        — work through R1 to R4 on everything you've completed.`;
     block.innerHTML = _progSection(
       `${_progHeader("📖", "Pace Tracker", _PC.purple)}
       <div style="font-size:0.85rem;color:${_PC.text2};line-height:1.8;font-family:${_PC.font}">
-        The chapter-completion window has closed. New chapters started now won't get
-        their full revision cycle before the exam.
-        <br><br>
-        <span style="color:${_PC.text};font-weight:700">Focus entirely on revisions</span>
-        — R1 through R4 on everything you've already completed.
+        ${_revMsg}
       </div>`,
-      `border-top:3px solid ${_PC.purple};`
+      `border-top:3px solid ${_PC.purple};`,
     );
     return;
   }
@@ -3587,23 +5292,53 @@ function renderPace() {
         Speed over depth — complete a chapter, do R1 next day, R2 three days later.
         Start with your highest-weightage subjects.
       </div>`,
-      `border-top:3px solid ${_PC.red};`
+      `border-top:3px solid ${_PC.red};`,
     );
     return;
   }
 
   // ── Normal: pace pills anchored to safe window ──
-  const paceNeeded = paceNeededForSafe !== null ? paceNeededForSafe.toFixed(1) : "—";
+  const paceNeeded =
+    paceNeededForSafe !== null ? paceNeededForSafe.toFixed(1) : "—";
   const onTrack = onTrackForSafe;
-  const statusColor = onTrack ? _PC.green : _PC.red;
-  const statusLabel = onTrack ? "On Track 🟢" : "Behind Pace 🔴";
-  const avgPace = effectivePace > 0 ? effectivePace.toFixed(1) : "0.0";
+  const _graceOverflow =
+    onTrack &&
+    projectedFinish &&
+    safeFinishDate &&
+    Math.round(
+      (dateKeyToUTC(safeFinishDate) - dateKeyToUTC(projectedFinish)) / 86400000,
+    ) < 0;
+  const statusColor =
+    completed === 0
+      ? _PC.text3
+      : _graceOverflow
+        ? _PC.orange
+        : onTrack
+          ? _PC.green
+          : _PC.red;
+  const statusLabel =
+    completed === 0
+      ? "No data yet ⬜"
+      : _graceOverflow
+        ? "At Risk 🟡"
+        : onTrack
+          ? "On Track 🟢"
+          : "Behind Pace 🔴";
+  const avgPace =
+    remaining === 0
+      ? "Done"
+      : studyDaysCount >= 1 && effectivePace > 0
+        ? effectivePace.toFixed(1)
+        : "—";
   const projDate = projectedFinish ? fmtDate(projectedFinish) : "—";
 
   let trendTag = "";
-  if (paceRecovering)     trendTag = `<span style="font-size:0.58rem;font-weight:800;color:${_PC.green};background:${_PC.green}18;border:1px solid ${_PC.green}33;padding:2px 7px;border-radius:99px;margin-left:6px;font-family:${_PC.font}">↑ RECOVERING</span>`;
-  else if (paceImproving) trendTag = `<span style="font-size:0.58rem;font-weight:800;color:${_PC.green};background:${_PC.green}18;border:1px solid ${_PC.green}33;padding:2px 7px;border-radius:99px;margin-left:6px;font-family:${_PC.font}">↑ IMPROVING</span>`;
-  else if (paceSlipping)  trendTag = `<span style="font-size:0.58rem;font-weight:800;color:${_PC.orange};background:${_PC.orange}18;border:1px solid ${_PC.orange}33;padding:2px 7px;border-radius:99px;margin-left:6px;font-family:${_PC.font}">↓ SLIPPING</span>`;
+  if (paceRecovering)
+    trendTag = `<span style="font-size:0.58rem;font-weight:800;color:${_PC.green};background:${_PC.green}18;border:1px solid ${_PC.green}33;padding:2px 7px;border-radius:99px;margin-left:6px;font-family:${_PC.font}">↑ RECOVERING</span>`;
+  else if (paceImproving)
+    trendTag = `<span style="font-size:0.58rem;font-weight:800;color:${_PC.green};background:${_PC.green}18;border:1px solid ${_PC.green}33;padding:2px 7px;border-radius:99px;margin-left:6px;font-family:${_PC.font}">↑ IMPROVING</span>`;
+  else if (paceSlipping)
+    trendTag = `<span style="font-size:0.58rem;font-weight:800;color:${_PC.orange};background:${_PC.orange}18;border:1px solid ${_PC.orange}33;padding:2px 7px;border-radius:99px;margin-left:6px;font-family:${_PC.font}">↓ SLIPPING</span>`;
 
   const zoneBanner = nearZoneDrop
     ? `<div style="background:${_PC.orange}11;border:1px solid ${_PC.orange}33;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:0.65rem;color:${_PC.orange};font-family:${_PC.font}">⚠️ Safe window tightens in ${safeDaysLeft} days — accelerate now.</div>`
@@ -3618,8 +5353,8 @@ function renderPace() {
       `<span style="font-size:0.65rem;font-weight:800;color:${statusColor};background:${statusColor}18;border:1px solid ${statusColor}33;padding:3px 9px;border-radius:99px;font-family:${_PC.font}">${statusLabel}</span>`,
     )}
     ${zoneBanner}
-    <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:0.65rem;color:${_PC.text2};line-height:1.6;font-family:${_PC.font}">
-      <b style="color:${_PC.text}">Need/Day</b> = chapters left ÷ days to safe window (exam−30). &nbsp;
+    <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:0.75rem;color:${_PC.text2};line-height:1.6;font-family:${_PC.font}">
+      <b style="color:${_PC.text}">Need/Day</b> = chapters left ÷ days to safe window${profile && profile.deadline ? " (your deadline)" : " (exam−15)"}. &nbsp;
       <b style="color:${_PC.text}">Avg/Day</b> = your actual rate on days you studied${paceImproving ? " (using recent trend)" : ""}.
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
@@ -3699,7 +5434,8 @@ function renderSyllabusMap() {
     const displayName = MERGE[subj.name] || subj.name;
     if (seen.has(displayName)) {
       const existing = subjectSections.find((s) => s.name === displayName);
-      if (existing) existing.chapters = [...existing.chapters, ...subj.chapters];
+      if (existing)
+        existing.chapters = [...existing.chapters, ...subj.chapters];
       return;
     }
     seen.add(displayName);
@@ -3929,7 +5665,7 @@ function renderSubjectHealth() {
         .sort()
         .reverse();
       const fallbackDates = chs
-        .map((c) => c.dateAdded)
+        .map((c) => c.completedDate || c.dateAdded)
         .filter(Boolean)
         .sort()
         .reverse();
@@ -3981,24 +5717,24 @@ function renderSubjectHealth() {
     <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-left:3px solid ${s.color};border-radius:10px;padding:12px;transition:transform 0.15s,box-shadow 0.15s;cursor:default"
       onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.5)'"
       onmouseleave="this.style.transform='';this.style.boxShadow=''">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:5px">
-        <div style="font-size:0.73rem;font-weight:700;color:${_PC.text};font-family:${_PC.font};line-height:1.3">${sanitize(s.subj)}</div>
-        <span style="font-size:0.54rem;font-weight:800;letter-spacing:0.1em;color:${s.color};background:${s.color}20;padding:2px 6px;border-radius:99px;border:1px solid ${s.color}33;white-space:nowrap;font-family:${_PC.font}">${s.status}</span>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:5px;flex-wrap:wrap">
+        <div style="font-size:0.73rem;font-weight:700;color:${_PC.text};font-family:${_PC.font};line-height:1.3;min-width:0;flex:1">${sanitize(s.subj)}</div>
+        <span style="font-size:0.66rem;font-weight:800;letter-spacing:0.1em;color:${s.color};background:${s.color}20;padding:3px 9px;border-radius:99px;border:1px solid ${s.color}33;white-space:nowrap;font-family:${_PC.font};flex-shrink:0">${s.status}</span>
       </div>
       <div style="margin-bottom:4px">
-        <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:${_PC.text3};margin-bottom:3px;font-family:${_PC.font}"><span>Done</span><span>${s.done}/${s.syllabusTotal || s.total}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.70rem;color:${_PC.text2};margin-bottom:3px;font-family:${_PC.font}"><span>Done</span><span>${s.done}/${s.syllabusTotal || s.total}</span></div>
         ${_bar(s.pct, s.color, 5)}
       </div>
       ${
         completedChs.length > 0
           ? `<div style="margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;font-size:0.58rem;color:${_PC.text3};margin-bottom:3px;font-family:${_PC.font}"><span>Fully revised</span><span>${revQualityPct}%</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.70rem;color:${_PC.text2};margin-bottom:3px;font-family:${_PC.font}"><span>Fully revised</span><span>${revQualityPct}%</span></div>
         ${_bar(revQualityPct, _PC.purple, 4)}
       </div>`
           : ""
       }
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
-        <span style="font-size:0.58rem;color:${_PC.text3};font-family:${_PC.font}">${lastSeenLabel}</span>
+        <span style="font-size:0.70rem;color:${_PC.text2};font-family:${_PC.font}">${lastSeenLabel}</span>
         <div style="display:flex;gap:5px;align-items:center">
           ${s.dueSoon > 0 ? `<span style="font-size:0.58rem;color:${_PC.yellow};font-family:${_PC.font}">⏰ ${s.dueSoon} due soon</span>` : ""}
         </div>
@@ -4015,7 +5751,7 @@ function renderSubjectHealth() {
       ${_statPill("Strong", strong, _PC.green)}
       ${_statPill("Danger", danger, danger > 0 ? _PC.red : _PC.text3)}
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">${cards}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">${cards}</div>
   `,
     `border-top:3px solid ${_PC.yellow};`,
   );
@@ -4076,7 +5812,9 @@ function renderRevisionCoverage() {
   const data = levels.map((l) => {
     const eligible = completedChapters.filter((c) => {
       const refDate = c.completedDate || c.dateAdded;
-      const age = Math.round((dateKeyToUTC(today_rc) - dateKeyToUTC(refDate)) / 86400000);
+      const age = Math.round(
+        (dateKeyToUTC(today_rc) - dateKeyToUTC(refDate)) / 86400000,
+      );
       return age >= minAgeDays[l.n];
     });
     const done = eligible.filter((c) =>
@@ -4085,16 +5823,37 @@ function renderRevisionCoverage() {
       ),
     ).length;
     const eligibleTotal = eligible.length;
-    return { ...l, done, eligibleTotal, pct: eligibleTotal > 0 ? Math.round((done / eligibleTotal) * 100) : null };
+    return {
+      ...l,
+      done,
+      eligibleTotal,
+      pct: eligibleTotal > 0 ? Math.round((done / eligibleTotal) * 100) : null,
+    };
   });
 
   const weights = [0.1, 0.2, 0.3, 0.4];
   const scorableLevels = data.filter((d) => d.pct !== null);
-  const memScore = scorableLevels.length === 0 ? null : Math.round(
-    scorableLevels.reduce((acc, d) => acc + d.pct * weights[data.indexOf(d)], 0) /
-    scorableLevels.reduce((acc, d) => acc + weights[data.indexOf(d)], 0)
-  );
-  const memColor = memScore === null ? _PC.text3 : memScore >= 70 ? _PC.green : memScore >= 40 ? _PC.yellow : _PC.red;
+  const memScore =
+    scorableLevels.length === 0
+      ? null
+      : Math.round(
+          scorableLevels.reduce(
+            (acc, d) => acc + d.pct * weights[data.indexOf(d)],
+            0,
+          ) /
+            scorableLevels.reduce(
+              (acc, d) => acc + weights[data.indexOf(d)],
+              0,
+            ),
+        );
+  const memColor =
+    memScore === null
+      ? _PC.text3
+      : memScore >= 70
+        ? _PC.green
+        : memScore >= 40
+          ? _PC.yellow
+          : _PC.red;
 
   const rows = data
     .map(
@@ -4111,7 +5870,7 @@ function renderRevisionCoverage() {
           </div>
           <span style="font-size:0.7rem;font-weight:800;color:${d.color};font-family:${_PC.font}">${d.eligibleTotal > 0 ? d.done + "/" + d.eligibleTotal : "—"}</span>
         </div>
-        ${_bar(d.pct, d.color, 6)}
+        ${d.pct !== null ? _bar(d.pct, d.color, 6) : _bar(0, _PC.border, 6)}
       </div>
     </div>`,
     )
@@ -4120,7 +5879,7 @@ function renderRevisionCoverage() {
   block.innerHTML = _progSection(
     `
     ${_progHeader("🔁", "Revision Coverage", _PC.green)}
-    <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:0.68rem;color:${_PC.text2};line-height:1.6;font-family:${_PC.font}">
+    <div style="background:${_PC.bg4};border:1px solid ${_PC.border};border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:0.76rem;color:${_PC.text2};line-height:1.6;font-family:${_PC.font}">
       When you complete a chapter, the app schedules 4 revision sessions: next day (R1), after 3 days (R2), after 1 week (R3), and after 1 month (R4). Each bar shows how many of your completed chapters have had that revision done. The later the revision, the more it locks in memory.
     </div>
     <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
@@ -4128,7 +5887,7 @@ function renderRevisionCoverage() {
       ${_statPill("Fully Revised", data[3].done, _PC.green)}
       ${_statPill("Memory Score", memScore === null ? "—" : memScore + "%", memColor)}
     </div>
-    <div style="font-size:0.63rem;color:${_PC.text3};font-family:${_PC.font};margin-bottom:10px">Memory Score = weighted average of all 4 revision levels (R4 counts most)</div>
+    <div style="font-size:0.72rem;color:${_PC.text2};font-family:${_PC.font};margin-bottom:10px">Memory Score = weighted average of all 4 revision levels (R4 counts most)</div>
     <div>${rows}</div>
   `,
     `border-top:3px solid ${_PC.green};`,
@@ -4158,16 +5917,17 @@ function renderIntelligenceReport() {
       const daysAgo = Math.round((todayMs - examMs) / 86400000);
       block.innerHTML = _progSection(
         _progHeader("🎓", "Coach Insights", _PC.purple) +
-        `<div style="text-align:center;padding:24px 16px">
+          `<div style="text-align:center;padding:24px 16px">
           <div style="font-size:1.8rem;margin-bottom:10px">🎓</div>
           <div style="font-size:0.95rem;color:${_PC.text};font-family:${_PC.font};font-style:italic;line-height:1.7">
-            ${daysAgo === 0
-              ? "Your exam is today. You've done the work — go show it."
-              : `Your exam was ${daysAgo} day${daysAgo !== 1 ? "s" : ""} ago. Hope it went well — you put in the work.`
+            ${
+              daysAgo === 0
+                ? "Your exam is today. You've done the work — go show it."
+                : `Your exam was ${daysAgo} day${daysAgo !== 1 ? "s" : ""} ago. Hope it went well — you put in the work.`
             }
           </div>
         </div>`,
-        `border-top:3px solid ${_PC.purple};`
+        `border-top:3px solid ${_PC.purple};`,
       );
       return;
     }
@@ -4181,7 +5941,16 @@ function renderIntelligenceReport() {
   // Use shared pace state — identical numbers and verdicts as Coach and Pace Tracker
   const _ps = _computePaceState();
   if (_ps && !_ps.inSilentZone) {
-    const { effectivePace, paceNeededForSafe, onTrackForSafe, projectedFinish, safeFinishDate, inRevisionWindow, isEmergency } = _ps;
+    const {
+      effectivePace,
+      paceNeededForSafe,
+      onTrackForSafe,
+      projectedFinish,
+      safeFinishDate,
+      inRevisionWindow,
+      isEmergency,
+      studyDaysCount,
+    } = _ps;
     const remaining = total - completed;
     if (isEmergency) {
       insights.push({
@@ -4192,7 +5961,15 @@ function renderIntelligenceReport() {
         text: `Revision window closed with <strong style="color:${_PC.text}">${remaining}</strong> chapters remaining. Complete a chapter, do R1 next day, R2 three days later. Prioritise by weightage — highest-impact subjects first.`,
       });
     } else if (!inRevisionWindow) {
-      if (paceNeededForSafe !== null) {
+      if (paceNeededForSafe !== null && completed >= 3 && studyDaysCount >= 2) {
+        const _insightsBuf =
+          projectedFinish && safeFinishDate
+            ? Math.round(
+                (dateKeyToUTC(safeFinishDate) - dateKeyToUTC(projectedFinish)) /
+                  86400000,
+              )
+            : 0;
+        const _insightsGrace = onTrackForSafe && _insightsBuf < 0;
         if (!onTrackForSafe) {
           const gap = (paceNeededForSafe - effectivePace).toFixed(1);
           insights.push({
@@ -4202,7 +5979,7 @@ function renderIntelligenceReport() {
             priority: 1,
             text: `Need <strong style="color:${_PC.text}">${paceNeededForSafe.toFixed(1)}</strong> chapters/day to hit safe window — averaging <strong style="color:${_PC.text}">${effectivePace.toFixed(1)}</strong>. Gap: <strong style="color:${_PC.red}">${gap}</strong>/day.`,
           });
-        } else {
+        } else if (!_insightsGrace && remaining > 0) {
           insights.push({
             icon: "✅",
             color: _PC.green,
@@ -4213,10 +5990,40 @@ function renderIntelligenceReport() {
         }
       }
       if (projectedFinish && safeFinishDate) {
-        const buffer = Math.round((dateKeyToUTC(safeFinishDate) - dateKeyToUTC(projectedFinish)) / 86400000);
-        // Suppress WILL OVERFLOW when URGENT already fired — same underlying situation, redundant noise
-        const urgentAlreadyShown = insights.some((ins) => ins.tag === "URGENT");
-        if (buffer < 0 && !urgentAlreadyShown) {
+        const buffer = Math.round(
+          (dateKeyToUTC(safeFinishDate) - dateKeyToUTC(projectedFinish)) /
+            86400000,
+        );
+        if (onTrackForSafe) {
+          // Student is on track — show projection tag only, never alongside ON TRACK
+          if (buffer >= 0 && buffer <= 3) {
+            insights.push({
+              icon: "🟡",
+              color: _PC.yellow,
+              tag: "TIGHT FINISH",
+              priority: 2,
+              text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projectedFinish)}</strong> — only <strong style="color:${_PC.yellow}">${buffer} day${buffer !== 1 ? "s" : ""} before</strong> the safe window. No margin for error.`,
+            });
+          } else if (buffer > 3) {
+            insights.push({
+              icon: "🟢",
+              color: _PC.green,
+              tag: "WILL FINISH EARLY",
+              priority: 4,
+              text: `On track to finish <strong style="color:${_PC.text}">${fmtDate(projectedFinish)}</strong> — <strong style="color:${_PC.green}">${buffer} days ahead</strong> of the safe window.`,
+            });
+          } else {
+            // buffer < 0 but onTrackForSafe: grace zone — proj overflows safe window, expose it
+            insights.push({
+              icon: "🟡",
+              color: _PC.orange,
+              tag: "AT RISK",
+              priority: 2,
+              text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projectedFinish)}</strong> — <strong style="color:${_PC.orange}">${Math.abs(buffer)} day${Math.abs(buffer) !== 1 ? "s" : ""} past</strong> the safe window. Pace is close — a small daily increase closes it.`,
+            });
+          }
+        } else {
+          // Student is not on track — show overflow warning
           insights.push({
             icon: "🔴",
             color: _PC.red,
@@ -4224,31 +6031,19 @@ function renderIntelligenceReport() {
             priority: 1,
             text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projectedFinish)}</strong> — <strong style="color:${_PC.red}">${Math.abs(buffer)} days AFTER</strong> the safe window. Increase your daily pace.`,
           });
-        } else if (buffer <= 3) {
-          insights.push({
-            icon: "🟡",
-            color: _PC.yellow,
-            tag: "TIGHT FINISH",
-            priority: 2,
-            text: `Projected finish <strong style="color:${_PC.text}">${fmtDate(projectedFinish)}</strong> — only <strong style="color:${_PC.yellow}">${buffer} day${buffer !== 1 ? "s" : ""} before</strong> the safe window. No margin for error.`,
-          });
-        } else {
-          insights.push({
-            icon: "🟢",
-            color: _PC.green,
-            tag: "WILL FINISH EARLY",
-            priority: 4,
-            text: `On track to finish <strong style="color:${_PC.text}">${fmtDate(projectedFinish)}</strong> — <strong style="color:${_PC.green}">${buffer} days ahead</strong> of the safe window.`,
-          });
         }
       }
     } else {
+      const _remaining = total - completed;
       insights.push({
-        icon: "📖",
-        color: _PC.purple,
-        tag: "REVISION WINDOW",
-        priority: 1,
-        text: `The chapter-completion window has closed. Focus on revisions — R1 through R4 on everything completed.`,
+        icon: _remaining === 0 ? "✅" : "📖",
+        color: _remaining === 0 ? _PC.green : _PC.purple,
+        tag: _remaining === 0 ? "SYLLABUS DONE" : "REVISION WINDOW",
+        priority: _remaining === 0 ? 3 : 1,
+        text:
+          _remaining === 0
+            ? `Every chapter done — revision mode only. Keep clearing your scheduled sessions daily.`
+            : `The chapter-completion window has closed. Focus on revisions — R1 through R4 on everything completed.`,
       });
     }
   }
@@ -4302,9 +6097,13 @@ function renderIntelligenceReport() {
     if (chs.length === 0) {
       // Completely untouched subject — no user-added chapters at all
       const syllTotal = _syllabusTotal(subj) || "?";
-      const profileAgeDays = profile && profile.dateCreated
-        ? Math.round((dateKeyToUTC(today) - dateKeyToUTC(profile.dateCreated)) / 86400000)
-        : 999;
+      const profileAgeDays =
+        profile && profile.dateCreated
+          ? Math.round(
+              (dateKeyToUTC(today) - dateKeyToUTC(profile.dateCreated)) /
+                86400000,
+            )
+          : 999;
       if (startedSubjectCount >= 4 && profileAgeDays >= 7) {
         // User is actively studying other subjects — this silence is now meaningful
         insights.push({
@@ -4369,7 +6168,9 @@ function renderIntelligenceReport() {
     if (c.status !== "Completed") return false;
     const refDate = c.completedDate || c.dateAdded;
     if (!refDate) return false;
-    return Math.round((dateKeyToUTC(today) - dateKeyToUTC(refDate)) / 86400000) > 30;
+    return (
+      Math.round((dateKeyToUTC(today) - dateKeyToUTC(refDate)) / 86400000) > 30
+    );
   });
   const fullyRevised = completedChapters.filter((c) =>
     [1, 3, 7, 30].every((n) =>
@@ -4389,6 +6190,40 @@ function renderIntelligenceReport() {
       priority: 2,
       text: `${completed} chapters done, but only <strong style="color:${_PC.text}">${fullyRevised}</strong> fully revised (chapters older than 30 days). Memory fades without revision.`,
     });
+  }
+  // Also catch recent chapters (under 30 days) with high permanent miss rate
+  // This fires for students who rushed all chapters but ignored revisions entirely
+  const _recentCompleted = syllabusChaps.filter((c) => {
+    if (c.status !== "Completed") return false;
+    const refDate = c.completedDate || c.dateAdded;
+    if (!refDate) return false;
+    const _age = Math.round(
+      (dateKeyToUTC(today) - dateKeyToUTC(refDate)) / 86400000,
+    );
+    return _age >= 1 && _age <= 30;
+  });
+  if (_recentCompleted.length >= 5) {
+    const _r1Settled = _recentCompleted.filter((c) => {
+      const _r1 = revisions.find(
+        (r) => r.chapterId === c.id && r.dayOffset === 1,
+      );
+      return _r1 && (_r1.done || _r1.missedPermanently);
+    });
+    const _r1Done = _r1Settled.filter((c) => {
+      const _r1 = revisions.find(
+        (r) => r.chapterId === c.id && r.dayOffset === 1,
+      );
+      return _r1 && _r1.done;
+    }).length;
+    if (_r1Settled.length >= 5 && _r1Done / _r1Settled.length < 0.3) {
+      insights.push({
+        icon: "📉",
+        color: _PC.yellow,
+        tag: "LOW RETENTION",
+        priority: 2,
+        text: `${_r1Settled.length - _r1Done} of ${_r1Settled.length} recently completed chapters missed their first revision. R1 is the most critical — without it, memory of a chapter drops sharply within days.`,
+      });
+    }
   }
 
   for (let d = 1; d <= 3; d++) {
@@ -4512,6 +6347,10 @@ function initApp() {
   // Without this, old users get profileAgeDays = 999 and see NEGLECTED spam on first open
   if (profile && !profile.dateCreated) {
     profile.dateCreated = todayStr();
+    localStorage.setItem("st_profile", JSON.stringify(profile));
+  }
+  if (profile && !profile.setupSeen && profile.examDate && profile.deadline) {
+    profile.setupSeen = true;
     localStorage.setItem("st_profile", JSON.stringify(profile));
   }
   rebuildSubjectsFromSyllabus();
@@ -4655,6 +6494,7 @@ function saveProfile() {
     profile.lang2 = document.getElementById("prof-lang2").value;
   if (document.getElementById("prof-elective"))
     profile.elective = document.getElementById("prof-elective").value;
+  if (profile.examDate && profile.deadline) profile.setupSeen = true;
   localStorage.setItem("st_profile", JSON.stringify(profile));
   const streamChanged =
     oldStream !== profile.stream ||
@@ -4806,42 +6646,49 @@ async function loadSyllabusAndInit() {
     window._syllabus = null;
     console.log("Syllabus load failed:", e);
   }
-  const profileBeforeReset = profile;
   _hardResetIfNeeded();
-  if (!profile && profileBeforeReset) {
-    profile = profileBeforeReset;
-    localStorage.setItem("st_profile", JSON.stringify(profile));
-  }
   migrateOldData();
   initApp();
 }
 
 function _hardResetIfNeeded() {
-  if (localStorage.getItem("st_v2_reset")) return;
   localStorage.setItem("st_v2_reset", "1");
-  localStorage.clear();
-  localStorage.setItem("st_v2_reset", "1");
-  chapters = [];
-  revisions = [];
-  missedRevisions = [];
-  profile = null;
-  subjects = [...DEFAULT_SUBJECTS];
-  streak = { count: 0, lastDate: "" };
-  weeklyLog = {};
-  coins = 0;
 }
 
 function migrateOldData() {
-  if (!window._syllabus) return;
   let dirty = false;
 
   // Migration 0 — class 9 no longer supported, bump to 10
+  // Does NOT need syllabus — runs always
   if (profile && profile.cls === "9") {
     profile.cls = "10";
     dirty = true;
   }
 
+  // Migration 2 — fix old History/Civics chapters stored with raw subject names
+  // Does NOT need syllabus — runs always
+  chapters.forEach((ch) => {
+    if (ch.subject === "History" || ch.subject === "Civics") {
+      ch.subject = "History & Civics";
+      dirty = true;
+    }
+  });
+  // Fix revisions too
+  revisions.forEach((r) => {
+    if (r.subject === "History" || r.subject === "Civics") {
+      r.subject = "History & Civics";
+      dirty = true;
+    }
+  });
+
+  // Syllabus-dependent migrations — skip only these if syllabus failed to load
+  if (!window._syllabus) {
+    if (dirty) save();
+    return;
+  }
+
   // Migration 1 — backfill isCustom on all existing chapters that don't have it
+  // Needs syllabus to check chapter names against known list
   const needsCustomCheck = chapters.filter((c) => c.isCustom === undefined);
   if (needsCustomCheck.length > 0) {
     const aliases = { "History & Civics": ["History", "Civics"] };
@@ -4867,21 +6714,6 @@ function migrateOldData() {
     });
   }
 
-  // Migration 2 — fix old History/Civics chapters stored with raw subject names
-  chapters.forEach((ch) => {
-    if (ch.subject === "History" || ch.subject === "Civics") {
-      ch.subject = "History & Civics";
-      dirty = true;
-    }
-  });
-  // Fix revisions too
-  revisions.forEach((r) => {
-    if (r.subject === "History" || r.subject === "Civics") {
-      r.subject = "History & Civics";
-      dirty = true;
-    }
-  });
-
   // Migration 3 — rebuild subjects list if profile exists but subjects still has raw defaults
   if (!localStorage.getItem("st_m3_done")) {
     localStorage.setItem("st_m3_done", "1");
@@ -4891,7 +6723,7 @@ function migrateOldData() {
       }
     }
   }
-   // ⚠️  DELETED MIGRATION WARNING (M4, never shipped — removed March 2026)
+  // ⚠️  DELETED MIGRATION WARNING (M4, never shipped — removed March 2026)
   // M4 was written to wipe ghost chapters auto-loaded by autoLoadSyllabusChapters_DISABLED.
   // It was NEVER deployed. Its guard key (st_m4_done) therefore does not exist on any device.
   // The wipe block has been removed because:
