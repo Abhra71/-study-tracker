@@ -45,19 +45,46 @@
           "color": "#d97706",
           "chapters": [
             { "id": "his_01", "name": "The First War Of Independence (1857)" },
-            { "id": "his_02", "name": "Factors Leading To The Growth Of Nationalism And Foundation Of The Indian National Congress" },
-            { "id": "his_03", "name": "Objectives And Methods Of Struggle Of The Early Nationalists" },
-            { "id": "his_04", "name": "Second Phase Of The Indian National Movement: Partition Of Bengal And Other Developments" },
+            {
+              "id": "his_02",
+              "name": "Factors Leading To The Growth Of Nationalism And Foundation Of The Indian National Congress"
+            },
+            {
+              "id": "his_03",
+              "name": "Objectives And Methods Of Struggle Of The Early Nationalists"
+            },
+            {
+              "id": "his_04",
+              "name": "Second Phase Of The Indian National Movement: Partition Of Bengal And Other Developments"
+            },
             { "id": "his_05", "name": "Muslim League And Its Objectives" },
-            { "id": "his_06", "name": "National Movement During The First World War: Lucknow Pact And Other Developments" },
+            {
+              "id": "his_06",
+              "name": "National Movement During The First World War: Lucknow Pact And Other Developments"
+            },
             { "id": "his_07", "name": "National Movement: 1919–1934" },
-            { "id": "his_08", "name": "The Cripps Mission And The Quit India Movement" },
-            { "id": "his_09", "name": "Subhash Chandra Bose, Forward Bloc And Indian National Army (INA)" },
-            { "id": "his_10", "name": "Independence And The Partition Of India" },
+            {
+              "id": "his_08",
+              "name": "The Cripps Mission And The Quit India Movement"
+            },
+            {
+              "id": "his_09",
+              "name": "Subhash Chandra Bose, Forward Bloc And Indian National Army (INA)"
+            },
+            {
+              "id": "his_10",
+              "name": "Independence And The Partition Of India"
+            },
             { "id": "his_11", "name": "The First World War (1914–1918)" },
-            { "id": "his_12", "name": "Rise Of Dictatorships: Fascism In Italy And Nazism In Germany" },
+            {
+              "id": "his_12",
+              "name": "Rise Of Dictatorships: Fascism In Italy And Nazism In Germany"
+            },
             { "id": "his_13", "name": "The Second World War (1939–1945)" },
-            { "id": "his_14", "name": "United Nations Organization: Origin, Objectives And The Principal Organs" },
+            {
+              "id": "his_14",
+              "name": "United Nations Organization: Origin, Objectives And The Principal Organs"
+            },
             { "id": "his_15", "name": "Major Agencies Of The United Nations" },
             { "id": "his_16", "name": "The Non-Aligned Movement" }
           ]
@@ -68,9 +95,18 @@
           "color": "#b45309",
           "chapters": [
             { "id": "civ_01", "name": "The Union Parliament" },
-            { "id": "civ_02", "name": "The Union Executive: The President and the Vice-President" },
-            { "id": "civ_03", "name": "The Union Executive: The Prime Minister, Union Cabinet" },
-            { "id": "civ_04", "name": "The Union Judiciary: The Supreme Court" },
+            {
+              "id": "civ_02",
+              "name": "The Union Executive: The President and the Vice-President"
+            },
+            {
+              "id": "civ_03",
+              "name": "The Union Executive: The Prime Minister, Union Cabinet"
+            },
+            {
+              "id": "civ_04",
+              "name": "The Union Judiciary: The Supreme Court"
+            },
             { "id": "civ_05", "name": "The State Judiciary: The High Courts" },
             { "id": "civ_06", "name": "The Subordinate Courts" }
           ]
@@ -80,7 +116,10 @@
           "book": "Frank Modern Certificate Geography Part II",
           "color": "#059669",
           "chapters": [
-            { "id": "geo_01", "name": "Map Study: Interpretation of Topographical Maps" },
+            {
+              "id": "geo_01",
+              "name": "Map Study: Interpretation of Topographical Maps"
+            },
             { "id": "geo_02", "name": "Maps of India" },
             { "id": "geo_03", "name": "Climate" },
             { "id": "geo_04", "name": "Soil Resources" },
@@ -89,7 +128,10 @@
             { "id": "geo_07", "name": "Mineral & Energy Resources" },
             { "id": "geo_08", "name": "Agriculture in India — I" },
             { "id": "geo_09", "name": "Agriculture in India — II" },
-            { "id": "geo_10", "name": "Manufacturing Industries: Mineral-Based" },
+            {
+              "id": "geo_10",
+              "name": "Manufacturing Industries: Mineral-Based"
+            },
             { "id": "geo_11", "name": "Manufacturing Industries: Agro-Based" },
             { "id": "geo_12", "name": "Transport" },
             { "id": "geo_13", "name": "Waste Management — I" },
