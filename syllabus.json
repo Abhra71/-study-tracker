@@ -359,13 +359,40 @@
           "name": "Commercial Studies",
           "book": "TBD",
           "color": "#f97316",
-          "chapters": []
+          "chapters": [
+            { "id": "com_01", "name": "Stakeholders in Commercial Organizations" },
+            { "id": "com_02", "name": "Marketing and Sales" },
+            { "id": "com_03", "name": "Advertising and Sales Promotion" },
+            { "id": "com_04", "name": "Consumer Protection" },
+            { "id": "com_05", "name": "E-Commerce" },
+            { "id": "com_06", "name": "Capital and Revenue Expenditure and Income" },
+            { "id": "com_07", "name": "Final Accounts of Sole Proprietorship" },
+            { "id": "com_08", "name": "Fundamental Concepts of Cost" },
+            { "id": "com_09", "name": "Budgeting" },
+            { "id": "com_10", "name": "Sources of Finance" },
+            { "id": "com_11", "name": "Recruitment, Selection and Training" },
+            { "id": "com_12", "name": "Industrial Relations, Trade Unions and Social Security" },
+            { "id": "com_13", "name": "Logistics and Insurance" },
+            { "id": "com_14", "name": "Banking" },
+            { "id": "com_15", "name": "Government Initiatives in Environment Protection" }
+          ]
         },
         "economics_g2": {
           "name": "Economics",
           "book": "TBD",
           "color": "#06b6d4",
-          "chapters": []
+          "chapters": [
+            { "id": "eco_01", "name": "Theory of Demand" },
+            { "id": "eco_02", "name": "Theory of Supply" },
+            { "id": "eco_03", "name": "The Productive Mechanism" },
+            { "id": "eco_04", "name": "Land" },
+            { "id": "eco_05", "name": "Labour" },
+            { "id": "eco_06", "name": "Capital" },
+            { "id": "eco_07", "name": "Enterprise" },
+            { "id": "eco_08", "name": "Alternative Market Structures" },
+            { "id": "eco_09", "name": "The State and Economic Development" },
+            { "id": "eco_10", "name": "Money and Banking" }
+          ]
         }
       }
     },
