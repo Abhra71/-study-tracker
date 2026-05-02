@@ -36,7 +36,31 @@
     <!-- ── ONBOARDING ── -->
     <div id="onboardOverlay" class="overlay hidden">
       <div class="box" id="onboardBox">
-        <span class="emoji">📚</span>
+        <div class="mascot-onboard-wrap">
+          <!-- MASCOT: default expression — use for onboarding and general presence -->
+          <svg class="mascot-svg mascot-sm" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+            <!-- body -->
+            <ellipse cx="40" cy="52" rx="26" ry="28" fill="#1e1535" stroke="#b07fd4" stroke-width="1.5"/>
+            <!-- ear spikes -->
+            <polygon points="18,30 12,12 26,24" fill="#2a1d45" stroke="#b07fd4" stroke-width="1"/>
+            <polygon points="62,30 68,12 54,24" fill="#2a1d45" stroke="#b07fd4" stroke-width="1"/>
+            <!-- body shine -->
+            <ellipse cx="52" cy="36" rx="5" ry="3" fill="rgba(255,255,255,0.07)" transform="rotate(-30,52,36)"/>
+            <!-- eyes: calm half-lid default -->
+            <circle cx="30" cy="50" r="6" fill="#fff" opacity="0.95"/>
+            <circle cx="50" cy="50" r="6" fill="#fff" opacity="0.95"/>
+            <circle cx="30" cy="51" r="3.5" fill="#7c3aed"/>
+            <circle cx="50" cy="51" r="3.5" fill="#7c3aed"/>
+            <circle cx="31" cy="50" r="1.2" fill="#fff"/>
+            <circle cx="51" cy="50" r="1.2" fill="#fff"/>
+            <!-- calm eyelid lines -->
+            <path d="M24 47 Q30 44 36 47" stroke="#1e1535" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M44 47 Q50 44 56 47" stroke="#1e1535" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <!-- small smile -->
+            <path d="M30 62 Q40 68 50 62" stroke="#b07fd4" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          </svg>
+          <div class="mascot-bubble mascot-bubble-sm">I'll be in Coach once you're done ✦</div>
+        </div>
         <h2>Study Tracker</h2>
         <p>Let's set up your personal study space</p>
         <div class="field">
@@ -531,6 +555,22 @@
       <!-- ── COACH TAB ── -->
       <div id="tab-coach" class="tab-content">
         <div id="coach-voice-block"></div>
+        <div id="darshan-section" style="display:none">
+          <div id="darshan-response-wrap"></div>
+          <div id="darshan-bottom-spacer"></div>
+        </div>
+      </div>
+      <div id="darshan-sticky-bar" style="display:none">
+        <div id="darshan-credits-bar"></div>
+        <div id="darshan-input-row">
+          <input type="file" id="darshan-file-input" accept="image/*" style="display:none" onchange="handleDarshanImage(event)">
+          <button id="darshan-attach-btn" onclick="document.getElementById('darshan-file-input').click()" title="Attach image" style="background:none;border:none;color:var(--text2);font-size:1.1rem;cursor:pointer;padding:4px;flex-shrink:0;line-height:1">📎</button>
+          <textarea id="darshan-input" placeholder="Ask Darshan..." rows="1"></textarea>
+          <button id="darshan-voice-btn" onclick="toggleDarshanVoice()" title="Voice input" style="background:none;border:none;color:var(--text2);font-size:1.1rem;cursor:pointer;padding:4px;flex-shrink:0;line-height:1">🎤</button>
+          <button id="darshan-send-btn" onclick="askDarshan()">
+            <span id="darshan-btn-label">↑</span>
+          </button>
+        </div>
       </div>
 
       <!-- ── WEAK TAB ── -->
@@ -732,5 +772,49 @@
     </div>
 
     <script src="script.js"></script>
-  </body>
+  <div id="darshan-announce" class="darshan-announce-overlay hidden">
+  <div class="darshan-announce-box">
+    <button class="darshan-announce-close" onclick="closeDarshanAnnounce()">✕</button>
+    <div class="darshan-announce-glow"></div>
+    <div class="mascot-wrap">
+      <!-- MASCOT: excited expression — use for new feature announcements -->
+      <svg class="mascot-svg" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+        <!-- body -->
+        <ellipse cx="40" cy="52" rx="26" ry="28" fill="#1e1535" stroke="#b07fd4" stroke-width="1.5"/>
+        <!-- ear spikes -->
+        <polygon points="18,30 12,12 26,24" fill="#2a1d45" stroke="#b07fd4" stroke-width="1"/>
+        <polygon points="62,30 68,12 54,24" fill="#2a1d45" stroke="#b07fd4" stroke-width="1"/>
+        <!-- body shine -->
+        <ellipse cx="52" cy="36" rx="5" ry="3" fill="rgba(255,255,255,0.07)" transform="rotate(-30,52,36)"/>
+        <!-- eyes: wide open excited -->
+        <circle cx="30" cy="50" r="7" fill="#fff" opacity="0.95"/>
+        <circle cx="50" cy="50" r="7" fill="#fff" opacity="0.95"/>
+        <circle cx="31" cy="51" r="4" fill="#7c3aed"/>
+        <circle cx="51" cy="51" r="4" fill="#7c3aed"/>
+        <circle cx="32" cy="49" r="1.5" fill="#fff"/>
+        <circle cx="52" cy="49" r="1.5" fill="#fff"/>
+        <!-- blush -->
+        <ellipse cx="20" cy="58" rx="5" ry="3" fill="rgba(236,72,153,0.25)"/>
+        <ellipse cx="60" cy="58" rx="5" ry="3" fill="rgba(236,72,153,0.25)"/>
+        <!-- open smile -->
+        <path d="M28 63 Q40 73 52 63" stroke="#b07fd4" stroke-width="2" fill="rgba(140,70,220,0.2)" stroke-linecap="round"/>
+        <!-- sparkles -->
+        <text x="64" y="25" font-size="10" fill="#b07fd4" opacity="0.8">✦</text>
+        <text x="4" y="28" font-size="8" fill="#b07fd4" opacity="0.6">✦</text>
+      </svg>
+      <div class="mascot-bubble">Psst — something new! 👀</div>
+    </div>
+    <div class="darshan-announce-badge">NEW IN COACH</div>
+    <h2 class="darshan-announce-title">Meet Darshan</h2>
+    <p class="darshan-announce-sub">Your AI study mentor who actually knows your data.</p>
+    <div class="darshan-announce-pills">
+      <span>📊 Knows your pace</span>
+      <span>📚 Tracks chapters</span>
+      <span>🎯 Builds plans</span>
+      <span>💬 Solves doubts</span>
+    </div>
+    <button class="darshan-announce-cta" onclick="closeDarshanAnnounce(true)">Meet Darshan →</button>
+  </div>
+</div>
+</body>
 </html>
