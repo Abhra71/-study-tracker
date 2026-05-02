@@ -534,7 +534,7 @@ function finishOnboard() {
     elective,
     deadline: deadline || "",
     dateCreated: todayStr(),
-    setupSeen: !!(exam && deadline),
+    setupSeen: !!(exam && deadline) || (exam ? Math.max(0, Math.round((dateKeyToUTC(exam) - dateKeyToUTC(todayStr())) / 86400000)) < 15 : false),
   };
   localStorage.setItem("st_profile", JSON.stringify(profile));
   document.getElementById("onboardOverlay").classList.add("hidden");
@@ -1630,6 +1630,7 @@ function switchTab(e, name) {
     clearInterval(flipClockInterval);
     flipClockInterval = null;
   }
+  if (name !== "coach") _darshanHideBar();
   document
     .querySelectorAll(".tab-content")
     .forEach((t) => t.classList.remove("active"));
@@ -1643,7 +1644,10 @@ function switchTab(e, name) {
   if (name === "weak") renderWeak();
   if (name === "chapters") renderSubjectGrid();
   if (name === "progress") renderProgress();
-  if (name === "coach") renderCoachTab();
+  if (name === "coach") {
+    renderCoachTab();
+    initDarshan();
+  }
 }
 
 // ── SUBJECTS ──
@@ -1819,25 +1823,20 @@ function markRevDone(id) {
   if (!rev) return;
   if (rev.done) return; // prevent double-tap double rewards
 
-  // Capture button rect BEFORE renderAll() destroys the DOM
+  // Capture button rect BEFORE DOM changes
   const originEl =
     document.activeElement && document.activeElement.classList.contains("btn")
       ? document.activeElement
       : document.querySelector(`button[onclick*="${id}"]`);
   const originRect = originEl ? originEl.getBoundingClientRect() : null;
 
-  rev.done = true;
-  rev.completedOn = todayStr();
+  // Animate the row out before re-render
+  const rowEl = originEl ? originEl.closest(".rev-row") : null;
+  if (rowEl) rowEl.classList.add("rev-row-completing");
 
   const earned = coinForOffset(rev.dayOffset);
-  if (earned > 0) {
-    coins = (coins || 0) + earned;
-  }
-  rev.earnedCoins = earned;
 
-  save();
-  renderAll();
-
+  // Fire sounds and toast immediately — feels instant
   playDoneSound();
   if (earned > 0) {
     setTimeout(playCoinSound, 90);
@@ -1853,8 +1852,20 @@ function markRevDone(id) {
       ? `Teri mehnat ke +${earned}🪙 mil gaye. Party kab hai?`
       : "Revision done! Agli baar coins bhi milenge.",
   );
-  pushGroupUpdate();
-  checkGroupMilestone();
+
+  // Save and re-render after animation completes
+  setTimeout(() => {
+    rev.done = true;
+    rev.completedOn = todayStr();
+    if (earned > 0) {
+      coins = (coins || 0) + earned;
+    }
+    rev.earnedCoins = earned;
+    save();
+    renderAll();
+    pushGroupUpdate();
+    checkGroupMilestone();
+  }, 260);
 }
 function markGraceDone(id) {
   const rev = revisions.find((r) => r.id === id);
@@ -1867,17 +1878,12 @@ function markGraceDone(id) {
       : document.querySelector(`button[onclick*="${id}"]`);
   const originRect = originEl ? originEl.getBoundingClientRect() : null;
 
-  rev.done = true;
-  rev.completedOn = todayStr();
-  rev.completedInGrace = true;
+  // Animate row out before re-render
+  const rowEl = originEl ? originEl.closest(".rev-row") : null;
+  if (rowEl) rowEl.classList.add("rev-row-completing");
 
   const base = coinForOffset(rev.dayOffset);
   const earned = Math.max(1, base - 2);
-  rev.earnedCoins = earned;
-  coins = (coins || 0) + earned;
-
-  save();
-  renderAll();
 
   playDoneSound();
   if (earned > 0) {
@@ -1892,8 +1898,18 @@ function markGraceDone(id) {
     "",
     `Thoda late, par kiya toh! +${earned}🪙 (reduced reward)`,
   );
-  pushGroupUpdate();
-  checkGroupMilestone();
+
+  setTimeout(() => {
+    rev.done = true;
+    rev.completedOn = todayStr();
+    rev.completedInGrace = true;
+    rev.earnedCoins = earned;
+    coins = (coins || 0) + earned;
+    save();
+    renderAll();
+    pushGroupUpdate();
+    checkGroupMilestone();
+  }, 260);
 }
 
 function deleteRevision(id) {
@@ -2011,8 +2027,40 @@ function renderTodayRevisions() {
   document.getElementById("stat-chapters").textContent = chapters.length;
 
   if (due.length === 0 && grace.length === 0) {
-    grid.innerHTML =
-      '<div class="empty"><div class="emoji">🎉</div><p>No revisions due today!</p></div>';
+    const _streakNow = streak ? streak.count : 0;
+    const _daysLeft = profile && profile.examDate
+      ? Math.round((dateKeyToUTC(profile.examDate) - dateKeyToUTC(t)) / 86400000)
+      : null;
+    const _chapsDone = chapters.filter(c => c.status === "Completed").length;
+    let _emptyEmoji = "🎉";
+    let _emptyMsg = "No revisions due today!";
+    let _emptySub = "";
+    if (_daysLeft !== null && _daysLeft <= 7 && _daysLeft > 0) {
+      _emptyEmoji = "✨";
+      _emptyMsg = "Queue is clear.";
+      _emptySub = `${_daysLeft} day${_daysLeft !== 1 ? "s" : ""} to exam — focus on what you know.`;
+    } else if (_streakNow >= 7) {
+      _emptyEmoji = "🔥";
+      _emptyMsg = "Clear day.";
+      _emptySub = `${_streakNow}-day streak intact. Keep it going.`;
+    } else if (_chapsDone === 0) {
+      _emptyEmoji = "📖";
+      _emptyMsg = "Nothing due yet.";
+      _emptySub = "Add your first completed chapter to start your revision schedule.";
+    } else if (_streakNow === 0) {
+      _emptyEmoji = "📚";
+      _emptyMsg = "No revisions today.";
+      _emptySub = "Good time to complete a new chapter.";
+    } else {
+      _emptyEmoji = "🎉";
+      _emptyMsg = "No revisions due today!";
+      _emptySub = "Enjoy the clear queue — or get a chapter ahead.";
+    }
+    grid.innerHTML = `<div class="empty">
+      <div class="emoji">${_emptyEmoji}</div>
+      <p>${_emptyMsg}</p>
+      ${_emptySub ? `<p style="font-size:0.75rem;color:var(--text3);margin-top:4px">${_emptySub}</p>` : ""}
+    </div>`;
     if (graceTimerInterval) {
       clearInterval(graceTimerInterval);
       graceTimerInterval = null;
@@ -3593,7 +3641,9 @@ function renderCoachTab() {
     const _noDeadlineCounts =
       !hasDeadline && (daysToExam === null || daysToExam >= 15);
     const _showSetup =
-      _noExam || _noDeadlineCounts || !(profile && profile.setupSeen);
+      (daysToExam !== null && daysToExam < 15 && !hasDeadline)
+        ? false
+        : _noExam || _noDeadlineCounts || !(profile && profile.setupSeen);
     const _isLateJoin =
       !_noExam && daysToExam !== null && daysToExam <= 14 && daysToExam > 5;
     const _noDeadline = !hasDeadline;
@@ -3633,6 +3683,11 @@ function renderCoachTab() {
         <div style="font-size:0.88rem;color:${_PC.text2};font-family:${F};line-height:1.7">You add chapters and mark them done. I build a <strong style="color:${_PC.text}">spaced revision schedule</strong> automatically — R1 next day, R2 after 3 days, R3 after 1 week, R4 after 1 month. This is how memory actually sticks for exams. I also track your <strong style="color:${_PC.text}">daily pace</strong>, tell you if you're on track to finish before your deadline, flag subjects you're neglecting, and warn you when revisions are piling up.</div>
       </div>`;
 
+      const _darshanTeaser = `<div style="background:linear-gradient(135deg,rgba(176,127,212,0.08),rgba(140,70,220,0.03));border:1px solid rgba(176,127,212,0.2);border-radius:10px;padding:11px 14px;margin-bottom:10px">
+        <div style="font-size:0.63rem;font-weight:800;letter-spacing:0.1em;color:${_PC.purple};font-family:${F};margin-bottom:5px">🔒 DARSHAN AI COACH — UNLOCKS AFTER SETUP</div>
+        <div style="font-size:0.82rem;color:${_PC.text2};font-family:${F};line-height:1.6">Complete setup to unlock your personal AI mentor. Darshan knows your chapters, pace, revision health and behaviour — and gives you specific honest coaching you cannot get anywhere else.</div>
+      </div>`;
+
       const _btnReady = !_noExam && !_noDeadlineCounts;
       const _dismissHtml = `<div style="text-align:center;padding-top:4px">
         <button
@@ -3658,6 +3713,7 @@ function renderCoachTab() {
           ${_step2Html}
           ${_step3Html}
         </div>
+        ${_darshanTeaser}
         ${_dismissHtml}
       </div>`;
       return;
@@ -6226,6 +6282,34 @@ function renderIntelligenceReport() {
     }
   }
 
+  // ── Chapters that will miss R4 before exam ──
+  if (profile && profile.examDate) {
+    const _r4Missing = syllabusChaps.filter((c) => {
+      if (c.status !== "Completed") return false;
+      const r4 = revisions.find(
+        (r) => r.chapterId === c.id && r.dayOffset === 30,
+      );
+      if (r4) return dateKeyToUTC(profile.examDate) < dateKeyToUTC(r4.dueDate);
+      return (
+        c.dateAdded &&
+        Math.round(
+          (dateKeyToUTC(profile.examDate) -
+            dateKeyToUTC(addDays(c.dateAdded, 30))) /
+            86400000,
+        ) < 0
+      );
+    }).length;
+    if (_r4Missing > 0) {
+      insights.push({
+        icon: "⏳",
+        color: _PC.orange,
+        tag: "MISSING R4",
+        priority: 2,
+        text: `<strong style="color:${_PC.text}">${_r4Missing}</strong> completed chapter${_r4Missing !== 1 ? "s" : ""} will miss their 30-day revision before the exam — R1, R2, and R3 still count.`,
+      });
+    }
+  }
+
   for (let d = 1; d <= 3; d++) {
     const futureDate = addDays(today, d);
     const dueCount = revisions.filter(
@@ -6352,6 +6436,14 @@ function initApp() {
   if (profile && !profile.setupSeen && profile.examDate && profile.deadline) {
     profile.setupSeen = true;
     localStorage.setItem("st_profile", JSON.stringify(profile));
+  }
+  // Backfill: exam within 15 days and no deadline possible — auto-approve setup
+  if (profile && !profile.setupSeen && profile.examDate) {
+    const _initDte = Math.max(0, Math.round((dateKeyToUTC(profile.examDate) - dateKeyToUTC(todayStr())) / 86400000));
+    if (_initDte < 15) {
+      profile.setupSeen = true;
+      localStorage.setItem("st_profile", JSON.stringify(profile));
+    }
   }
   rebuildSubjectsFromSyllabus();
   populateSubjectDropdown();
@@ -6645,6 +6737,13 @@ async function loadSyllabusAndInit() {
   } catch (e) {
     window._syllabus = null;
     console.log("Syllabus load failed:", e);
+    setTimeout(() => {
+      showToast(
+        "Syllabus data unavailable 📡",
+        "error",
+        "Some features may be limited. Check your connection and refresh.",
+      );
+    }, 800);
   }
   _hardResetIfNeeded();
   migrateOldData();
@@ -6820,6 +6919,565 @@ function autoLoadSyllabusChapters_DISABLED() {
 
   save();
   localStorage.setItem("st_syllabus_loaded", "1");
+}
+
+// ════════════════════════════════════════
+// ── DARSHAN AI COACH ──
+// ════════════════════════════════════════
+
+const _DARSHAN_WORKER = "https://cold-bird-f4ae.abhrachakraborty21.workers.dev";
+
+// Darshan announce popup — shows once per device after launch
+document.addEventListener("DOMContentLoaded", function() {
+  const KEY = "st_darshan_announced_v1";
+  const el = document.getElementById("darshan-announce");
+  if (!el) return;
+  if (!localStorage.getItem(KEY)) {
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
+});
+
+function closeDarshanAnnounce(goToCoach) {
+  localStorage.setItem("st_darshan_announced_v1", "1");
+  const el = document.getElementById("darshan-announce");
+  if (el) {
+    el.style.opacity = "0";
+    el.style.transition = "opacity 0.25s ease";
+    setTimeout(() => el.classList.add("hidden"), 260);
+  }
+  if (goToCoach) {
+    setTimeout(() => {
+      const coachTab = document.querySelector('[data-tab="coach"]') || document.getElementById("tab-coach");
+      if (coachTab) coachTab.click();
+    }, 280);
+  }
+}
+const _DARSHAN_MAX_DAILY = 50;
+
+function _darshanCreditsKey() {
+  return "st_darshan_" + todayStr();
+}
+
+function _darshanCreditsUsed() {
+  return parseInt(localStorage.getItem(_darshanCreditsKey()) || "0", 10);
+}
+
+function _darshanCreditsIncrement() {
+  const used = _darshanCreditsUsed();
+  localStorage.setItem(_darshanCreditsKey(), String(used + 1));
+}
+
+function _darshanUpdateCreditsBar() {
+  const bar = document.getElementById("darshan-credits-bar");
+  if (!bar) return;
+  const used = _darshanCreditsUsed();
+  const left = Math.max(0, _DARSHAN_MAX_DAILY - used);
+  const pct = Math.round((left / _DARSHAN_MAX_DAILY) * 100);
+  const color = left > 20 ? "#b07fd4" : left > 8 ? "#e8a020" : "#f87171";
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;justify-content:center">
+      <span style="font-size:0.6rem;color:var(--text3);font-family:'Baloo 2',sans-serif;letter-spacing:0.04em">${left > 0 ? `${left} left today` : "Resets at midnight"}</span>
+      <div style="width:80px;height:3px;background:rgba(176,127,212,0.12);border-radius:99px;overflow:hidden;position:relative">
+        <div id="darshan-credits-fill" style="height:100%;width:${pct}%;background:linear-gradient(90deg,${color},${color}cc);border-radius:99px;transition:width 0.6s ease;position:relative">
+          <div style="position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:darshanShimmer 2s ease-in-out infinite"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function buildAIContext() {
+  const ps = _computePaceState();
+  const today = todayStr();
+  const name = profile ? (profile.name || "").split(" ")[0] : "";
+  const syllabusChaps = chapters.filter(c => !c.isCustom);
+  const completed = syllabusChaps.filter(c => c.status === "Completed").length;
+  const total = _syllabusGrandTotal() || syllabusChaps.length;
+  const remaining = total - completed;
+  const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const streakCount = streak ? streak.count : 0;
+  const totalRevDone = revisions.filter(r => r.done).length;
+  const missedPermCount = revisions.filter(r => r.missedPermanently).length;
+  const weakCount = chapters.filter(c => c.isWeak).length;
+  const todayRevsDue = revisions.filter(r =>
+    !r.done && !r.missedPermanently && r.dueDate === today
+  ).length;
+
+  // Studied days this week
+  let studiedDaysThisWeek = 0;
+  for (let d = 0; d < 7; d++) {
+    if (weeklyLog[addDays(today, -d)] > 0) studiedDaysThisWeek++;
+  }
+
+  // Chapters losing R4
+  const examDate = profile ? profile.examDate : null;
+  const chapsLosingR4 = examDate
+    ? syllabusChaps.filter(c => {
+        if (c.status !== "Completed") return false;
+        const r4 = revisions.find(r => r.chapterId === c.id && r.dayOffset === 30);
+        if (r4) return dateKeyToUTC(examDate) < dateKeyToUTC(r4.dueDate);
+        return c.dateAdded && Math.round(
+          (dateKeyToUTC(examDate) - dateKeyToUTC(addDays(c.dateAdded, 30))) / 86400000
+        ) < 0;
+      }).length
+    : 0;
+
+  // Per-subject status
+  const subjectMap = {};
+  syllabusChaps.forEach(c => {
+    if (!subjectMap[c.subject]) subjectMap[c.subject] = [];
+    subjectMap[c.subject].push(c);
+  });
+
+  const subjectLines = Object.keys(subjectMap).map(subj => {
+    const chs = subjectMap[subj];
+    const subjTotal = _syllabusTotal(subj) || chs.length;
+    const subjDone = chs.filter(c => c.status === "Completed").length;
+    const pct = subjTotal > 0 ? Math.round((subjDone / subjTotal) * 100) : 0;
+    const revDates = revisions
+      .filter(r => r.done && r.completedOn && chs.find(c => c.id === r.chapterId))
+      .map(r => r.completedOn).sort().reverse();
+    const addedDates = chs.map(c => c.completedDate || c.dateAdded).filter(Boolean).sort().reverse();
+    const lastDate = revDates[0] || addedDates[0];
+    const daysSince = lastDate
+      ? Math.round((dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000)
+      : 999;
+    const status = daysSince > 14 ? "NEGLECTED" : daysSince > 7 ? "SLIPPING" : "OK";
+    return `${subj}: ${subjDone}/${subjTotal} (${pct}%) | Last activity: ${daysSince === 999 ? "never" : daysSince + "d ago"} | ${status}`;
+  }).join("\n");
+
+  // Active coach flags
+  const flags = [];
+  if (ps) {
+    if (ps.isEmergency) flags.push("EMERGENCY");
+    else if (!ps.onTrackForSafe && !ps.inRevisionWindow && ps.studyDaysCount >= 2) flags.push("URGENT");
+    else if (ps.onTrackForSafe && !ps.inRevisionWindow) flags.push("ON TRACK");
+    if (ps.inRevisionWindow) flags.push(remaining === 0 ? "SYLLABUS DONE" : "REVISION WINDOW");
+    if (ps.paceSlipping) flags.push("PACE SLIPPING");
+    if (ps.paceImproving) flags.push("PACE IMPROVING");
+    if (ps.paceRecovering) flags.push("RECOVERING");
+  }
+  if (missedPermCount > 0) flags.push("MISSED REVISIONS");
+  if (weakCount > 0) flags.push("WEAK SPOTS");
+  if (chapsLosingR4 > 0) flags.push("MISSING R4");
+  if (todayRevsDue > 0) flags.push(`${todayRevsDue} REVISIONS DUE TODAY`);
+
+  // Zone description
+  let zoneDesc = "Unknown";
+  if (ps) {
+    if (ps.isEmergency) zoneDesc = "Emergency — revision window closed with chapters remaining";
+    else if (ps.inRevisionWindow) zoneDesc = "Revision window — safe chapter-completion period has closed";
+    else if (ps.inSilentZone) zoneDesc = "Silent zone — exam in 5 days or less";
+    else if (ps.safeDaysLeft > 15) zoneDesc = "Zone 1 — comfortable, plenty of safe study time";
+    else if (ps.safeDaysLeft > 7) zoneDesc = "Zone 2 — tightening, urgency increasing";
+    else zoneDesc = "Zone 3 — urgent, very little safe time remaining";
+  }
+
+  // Compressed subject status
+  const subjCompressed = Object.keys(subjectMap).map(subj => {
+    const chs = subjectMap[subj];
+    const subjTotal = _syllabusTotal(subj) || chs.length;
+    const subjDone = chs.filter(c => c.status === "Completed").length;
+    const pct = subjTotal > 0 ? Math.round((subjDone / subjTotal) * 100) : 0;
+    const revDates = revisions
+      .filter(r => r.done && r.completedOn && chs.find(c => c.id === r.chapterId))
+      .map(r => r.completedOn).sort().reverse();
+    const addedDates = chs.map(c => c.completedDate || c.dateAdded).filter(Boolean).sort().reverse();
+    const lastDate = revDates[0] || addedDates[0];
+    const daysSince = lastDate
+      ? Math.round((dateKeyToUTC(today) - dateKeyToUTC(lastDate)) / 86400000)
+      : 999;
+    const st = daysSince > 14 ? "NEG" : daysSince > 7 ? "SLIP" : "OK";
+    const ds = daysSince === 999 ? "nvr" : daysSince + "d";
+    return `${subj}:${subjDone}/${subjTotal}(${pct}%)${ds}${st}`;
+  }).join(",");
+
+  // Load persistent memory
+  let memoryStr = "";
+  try {
+    const _mem = JSON.parse(localStorage.getItem("st_darshan_memory") || "[]");
+    const _activeMem = _mem.filter(m => m.active);
+    if (_activeMem.length > 0) {
+      memoryStr = "MEM:" + _activeMem.map(m => m.fact).join("|");
+    }
+  } catch(e) {}
+
+  const _trend = ps ? (ps.paceRecovering ? "RCVR" : ps.paceImproving ? "UP" : ps.paceSlipping ? "DOWN" : "STB") : "?";
+  const _status = flags.filter(f => ["EMERGENCY","URGENT","ON TRACK","REVISION WINDOW","SYLLABUS DONE"].includes(f)).join(",") || "?";
+  const _appDays = profile && profile.dateCreated ? Math.round((dateKeyToUTC(today) - dateKeyToUTC(profile.dateCreated)) / 86400000) : "?";
+
+  const lines = [
+    `P:${name}|ICSE10|${profile.stream||"sci"}|${_appDays}d`,
+    `EXAM:${examDate||"?"}|${ps?ps.daysToExam:"?"}d|SAFE:${ps?ps.safeFinishDate:"?"}|${ps?ps.safeDaysLeft:"?"}d`,
+    `PROG:${completed}/${total}(${completionPct}%)|REM:${remaining}|${_status}`,
+    `PACE:${ps?ps.effectivePace.toFixed(1):"?"}|NEED:${ps&&ps.paceNeededForSafe?ps.paceNeededForSafe.toFixed(1):"?"}|L7:${ps?ps.last7completed:"?"}|P7:${ps?ps.prev7completed:"?"}|${_trend}|PROJ:${ps&&ps.projectedFinish?ps.projectedFinish:"?"}`,
+    `REV:${totalRevDone}done|${missedPermCount}miss|${todayRevsDue}due|${chapsLosingR4}noR4|${weakCount}weak`,
+    `BEH:${streakCount}str|${studiedDaysThisWeek}/7wk|${coins||0}coins`,
+    `SUBJ:${subjCompressed||"none"}`,
+    `FLAGS:${flags.length>0?flags.join(","):"none"}`,
+    memoryStr,
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}
+
+// Conversation history — up to 25 messages per day
+let _darshanHistory = [];
+
+function handleDarshanImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const input = document.getElementById("darshan-input");
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+    window._darshanPendingImage = { base64, type: file.type, name: file.name };
+    input.placeholder = "Image attached — add a question or send now";
+    // Show preview in chat
+    const wrap = document.getElementById("darshan-response-wrap");
+    const preview = document.createElement("div");
+    preview.id = "darshan-img-preview";
+    preview.style.cssText = "text-align:right;margin:8px 0 4px";
+    preview.innerHTML = `<img src="${base64}" style="max-width:180px;max-height:180px;border-radius:10px;border:1px solid rgba(176,127,212,0.3)">`;
+    wrap.appendChild(preview);
+    _darshanScrollBottom();
+    showToast("Image attached", "info", file.name);
+  };
+  reader.readAsDataURL(file);
+  event.target.value = "";
+}
+
+let _darshanVoiceRecognition = null;
+let _darshanVoiceActive = false;
+function toggleDarshanVoice() {
+  const btn = document.getElementById("darshan-voice-btn");
+  const input = document.getElementById("darshan-input");
+  if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+    showToast("Not supported", "error", "Voice input not available in this browser.");
+    return;
+  }
+  if (_darshanVoiceActive) {
+    _darshanVoiceRecognition && _darshanVoiceRecognition.stop();
+    _darshanVoiceActive = false;
+    btn.textContent = "🎤";
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  _darshanVoiceRecognition = new SR();
+  _darshanVoiceRecognition.lang = "en-IN";
+  _darshanVoiceRecognition.interimResults = false;
+  _darshanVoiceRecognition.onstart = function() {
+    _darshanVoiceActive = true;
+    btn.textContent = "🎤";
+    btn.classList.add("recording");
+  };
+  _darshanVoiceRecognition.onresult = function(e) {
+    const transcript = e.results[0][0].transcript;
+    input.value = (input.value + " " + transcript).trim();
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 120) + "px";
+  };
+  _darshanVoiceRecognition.onend = function() {
+    _darshanVoiceActive = false;
+    btn.classList.remove("recording");
+    btn.textContent = "🎤";
+  };
+  _darshanVoiceRecognition.onerror = function() {
+    _darshanVoiceActive = false;
+    btn.textContent = "🎤";
+    showToast("Voice error", "error", "Could not capture audio.");
+  };
+  _darshanVoiceRecognition.start();
+}
+
+function _darshanShowSection() {
+  const sec = document.getElementById("darshan-section");
+  if (sec) sec.style.display = "block";
+  const bar = document.getElementById("darshan-sticky-bar");
+  if (bar) bar.style.display = "block";
+}
+
+function _darshanHideBar() {
+  const bar = document.getElementById("darshan-sticky-bar");
+  if (bar) bar.style.display = "none";
+}
+
+function _darshanAddUserBubble(text) {
+  const wrap = document.getElementById("darshan-response-wrap");
+  if (!wrap) return;
+  const div = document.createElement("div");
+  div.className = "darshan-user-bubble";
+  div.textContent = text;
+  wrap.appendChild(div);
+  _darshanScrollBottom();
+}
+
+function _darshanAddBubble(text, isLoading) {
+  const wrap = document.getElementById("darshan-response-wrap");
+  if (!wrap) return;
+  const div = document.createElement("div");
+  div.className = isLoading ? "darshan-loading" : "darshan-bubble";
+  if (!isLoading) {
+    div.innerHTML = `<div class="darshan-meta"><span class="darshan-ai-badge">✦ Darshan</span><span class="darshan-model-tag">Gemini 2.5 Flash</span></div><div class="darshan-body"></div>`;
+  } else {
+    div.innerHTML = `<div class="darshan-meta"><span class="darshan-ai-badge">✦ Darshan</span></div><div class="darshan-typing"><span></span><span></span><span></span></div>`;
+  }
+  wrap.appendChild(div);
+  _darshanScrollBottom();
+  return div;
+}
+
+function _darshanScrollBottom() {
+  setTimeout(() => {
+    // Scroll window directly by calculating spacer position
+    // scrollIntoView doesn't account for the fixed input bar covering the bottom
+    const spacer = document.getElementById("darshan-bottom-spacer");
+    if (!spacer) return;
+    const rect = spacer.getBoundingClientRect();
+    const inputBar = document.getElementById("darshan-sticky-bar");
+    const barH = inputBar ? inputBar.offsetHeight : 100;
+    const scrollTarget = window.scrollY + rect.bottom - window.innerHeight + barH + 16;
+    window.scrollTo({ top: scrollTarget, behavior: "instant" });
+  }, 40);
+}
+
+async function _darshanStreamText(bubble, text) {
+  const body = bubble.querySelector(".darshan-body");
+  if (!body) return;
+  const words = text.split(" ");
+  let i = 0;
+  return new Promise(resolve => {
+    const interval = setInterval(() => {
+      if (i >= words.length) {
+        body.innerHTML = text.replace(/\n/g, "<br>");
+        _darshanScrollBottom();
+        clearInterval(interval);
+        resolve();
+        return;
+      }
+      body.innerHTML = words.slice(0, i + 1).join(" ").replace(/\n/g, "<br>");
+      i += 1;
+      _darshanScrollBottom();
+    }, 22);
+  });
+}
+
+async function _darshanInitFirstMessage() {
+  const key = "st_darshan_met";
+  const inFlight = "st_darshan_inflight";
+  if (localStorage.getItem(key)) return;
+  if (localStorage.getItem(inFlight)) return;
+  localStorage.setItem(inFlight, "1");
+
+  _darshanShowSection();
+  const loading = _darshanAddBubble("...", true);
+
+  try {
+    const context = "__FIRST_INTERACTION__\n" + buildAIContext();
+    const resp = await fetch(_DARSHAN_WORKER, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context, question: "" })
+    });
+    const data = await resp.json();
+    if (loading) loading.remove();
+    if (data.reply) {
+      const bubble = _darshanAddBubble("", false);
+      await _darshanStreamText(bubble, data.reply);
+      _darshanHistory.push({ role: "assistant", text: data.reply });
+      _darshanCreditsIncrement();
+      localStorage.setItem(key, "1");
+    } else {
+      const fallback = "Hey — I'm Darshan, your study coach. Ask me anything about your preparation.";
+      const bubble = _darshanAddBubble("", false);
+      await _darshanStreamText(bubble, fallback);
+      localStorage.setItem(key, "1");
+    }
+  } catch (e) {
+    if (loading) loading.remove();
+    const fallback = "Hey — I'm Darshan, your study coach. Ask me anything about your preparation.";
+    const bubble = _darshanAddBubble("", false);
+    await _darshanStreamText(bubble, fallback);
+    localStorage.setItem(key, "1");
+  }
+
+  localStorage.removeItem(inFlight);
+  _darshanUpdateCreditsBar();
+}
+
+async function askDarshan() {
+  const input = document.getElementById("darshan-input");
+  const btn = document.getElementById("darshan-send-btn");
+  const label = document.getElementById("darshan-btn-label");
+  if (!input || !btn) return;
+
+  const question = input.value.trim();
+  if (!question) return;
+  if (question.length > 500) {
+    showToast("Too long", "error", "Keep it under 500 characters.");
+    return;
+  }
+
+  if (_darshanCreditsUsed() >= _DARSHAN_MAX_DAILY) {
+    showToast("Daily limit reached", "error", "Darshan resets at midnight IST.");
+    return;
+  }
+
+  if (!navigator.onLine) {
+    showToast("No internet", "error", "Darshan needs a connection to respond.");
+    return;
+  }
+
+  input.value = "";
+  input.style.height = "auto";
+  input.disabled = true;
+  btn.disabled = true;
+  label.textContent = "...";
+
+  _darshanShowSection();
+  _darshanAddUserBubble(question);
+
+  // Add to history
+  _darshanHistory.push({ role: "user", text: question });
+  if (_darshanHistory.length > 20) _darshanHistory = _darshanHistory.slice(-20);
+
+  const loading = _darshanAddBubble("...", true);
+
+  try {
+    const context = buildAIContext();
+    // Smart history — add most recent exchanges that fit within 2800 char budget
+    let historyStr = "";
+    if (_darshanHistory.length > 1) {
+      const _hdr = "\nHIST:\n";
+      const _entries = _darshanHistory.slice(0, -1).map(m =>
+        `${m.role === "user" ? "S" : "D"}:${m.text.substring(0, 180)}`
+      );
+      let _built = "";
+      for (let i = _entries.length - 1; i >= 0; i--) {
+        const _try = _entries[i] + "\n" + _built;
+        if ((context + _hdr + _try).length < 2800) {
+          _built = _try;
+        } else break;
+      }
+      if (_built) historyStr = _hdr + _built;
+    }
+
+    const resp = await fetch(_DARSHAN_WORKER, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        context: context + historyStr,
+        question,
+        image: window._darshanPendingImage || null
+      })
+    });
+    window._darshanPendingImage = null;
+    const _imgPreview = document.getElementById("darshan-img-preview");
+    if (_imgPreview) _imgPreview.removeAttribute("id");
+    const data = await resp.json();
+    if (loading) loading.remove();
+
+    if (data.reply) {
+      const bubble = _darshanAddBubble("", false);
+      await _darshanStreamText(bubble, data.reply);
+      _darshanHistory.push({ role: "assistant", text: data.reply });
+      if (_darshanHistory.length >= 25) {
+        _darshanExtractMemory(_darshanHistory.slice());
+        _darshanHistory = [];
+      }
+      _darshanCreditsIncrement();
+    } else if (data.error === "rate_limited") {
+      showToast("Darshan is busy", "error", "Try again in a minute.");
+      _darshanHistory.pop();
+    } else {
+      showToast("Something went wrong", "error", "Try again in a moment.");
+      _darshanHistory.pop();
+    }
+  } catch (e) {
+    if (loading) loading.remove();
+    showToast("Connection error", "error", "Check your internet and try again.");
+    _darshanHistory.pop();
+  }
+
+  input.disabled = false;
+  btn.disabled = false;
+  label.textContent = "↑";
+  input.focus();
+  _darshanUpdateCreditsBar();
+}
+
+async function _darshanExtractMemory(history) {
+  try {
+    const _convText = history.map(m =>
+      `${m.role === "user" ? "Student" : "Darshan"}: ${m.text}`
+    ).join("\n");
+    const _existingRaw = localStorage.getItem("st_darshan_memory");
+    const _existing = _existingRaw ? JSON.parse(_existingRaw) : [];
+    const _existingStr = _existing.length > 0
+      ? "\nExisting memory: " + JSON.stringify(_existing)
+      : "";
+    const _memPrompt = `Extract important long-term facts from this study coaching conversation.
+
+Rules:
+1. Only extract facts worth remembering across days — subject weaknesses, health issues, specific goals, commitments made, subjects they struggle with.
+2. Do NOT extract pace, chapters done, streak, coins — those are recalculated fresh each time.
+3. If conversation shows a stored fact is now resolved (student says "Biology is sorted" or "I am better now") — set active:false for that fact.
+4. Keep each fact under 10 words.
+5. Maximum 10 total facts. Drop oldest inactive ones first if over limit.
+6. Output ONLY valid JSON array. Format: [{"fact":"...","active":true}]
+
+Conversation:
+${_convText}
+${_existingStr}
+
+JSON:`;
+    const resp = await fetch(_DARSHAN_WORKER, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ context: _memPrompt, question: "extract_memory" })
+    });
+    const data = await resp.json();
+    if (data.reply) {
+      try {
+        const _clean = data.reply.replace(/```json|```/g, "").trim();
+        const _parsed = JSON.parse(_clean);
+        if (Array.isArray(_parsed)) {
+          localStorage.setItem("st_darshan_memory", JSON.stringify(_parsed.slice(0, 10)));
+        }
+      } catch(e) { console.log("Memory parse error:", e); }
+    }
+  } catch(e) { console.log("Memory extraction error:", e); }
+}
+
+function initDarshan() {
+  // Hide Darshan completely until setup is done — no profile = no data = no AI
+  // Exception: exam within 5 days — Darshan always available regardless of setupSeen
+  const _darshanDte = profile && profile.examDate
+    ? Math.max(0, Math.round((dateKeyToUTC(profile.examDate) - dateKeyToUTC(todayStr())) / 86400000))
+    : null;
+  const _darshanSilent = _darshanDte !== null && _darshanDte <= 5;
+  if (!profile || (!profile.setupSeen && !_darshanSilent)) {
+    _darshanHideBar();
+    return;
+  }
+  // Auto-expand textarea
+  const input = document.getElementById("darshan-input");
+  if (input) {
+    input.addEventListener("input", function() {
+      this.style.height = "auto";
+      this.style.height = Math.min(this.scrollHeight, 120) + "px";
+    });
+    input.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        askDarshan();
+      }
+    });
+  }
+  _darshanShowSection();
+  _darshanUpdateCreditsBar();
+  _darshanInitFirstMessage();
 }
 
 function init() {
