@@ -150,31 +150,24 @@
           "chapters": [
             { "id": "hin_01", "name": "Baat Athanni Ki" },
             { "id": "hin_02", "name": "Kaaki" },
-            { "id": "hin_03", "name": "Maha Yagya ka Puraskar" },
-            { "id": "hin_04", "name": "Neta Ji ka Chashma" },
-            { "id": "hin_05", "name": "Apna Apna Bhagya — Jainendra Kumar" },
-            { "id": "hin_06", "name": "Do Kalakar — Mannu Bhandari" },
-            { "id": "hin_07", "name": "Bade Ghar Ki Beti — Premchand" },
-            { "id": "hin_08", "name": "Sandeh — Jaishankar Prasad" },
-            { "id": "hin_09", "name": "Jamun ka Ped — Krishna Chander" },
-            { "id": "hin_10", "name": "Bhed aur Bhediye — Harishankar Parsai" },
-            { "id": "hin_11", "name": "Sakhi — Kabirdas" },
-            {
-              "id": "hin_12",
-              "name": "Girdhar ki Kundaliyan — Girdhar Kaviray"
-            },
-            {
-              "id": "hin_13",
-              "name": "Swarg Bana Sakte Hain — Ramdhari Singh Dinkar"
-            },
-            {
-              "id": "hin_14",
-              "name": "Wah Janmbhoomi Meri — Sohanlal Dwivedi"
-            },
-            { "id": "hin_15", "name": "Megh Aaye — Sarveshwar Dayal Saxena" },
-            { "id": "hin_16", "name": "Sur ke Pad — Surdas" },
-            { "id": "hin_17", "name": "Vinay ke Pad — Tulsidas" },
-            { "id": "hin_18", "name": "Bhiksuk — Suryakant Tripathi Nirala" },
+            { "id": "hin_03", "name": "Maharaj Ka Puraskar" },
+            { "id": "hin_04", "name": "Netaji Ka Chashma" },
+            { "id": "hin_05", "name": "Apna-Apna Bhaagya" },
+            { "id": "hin_06", "name": "Bade Ghar Ki Beti" },
+            { "id": "hin_07", "name": "Sandeh" },
+            { "id": "hin_08", "name": "Bheed Mein Khoya Aadmi" },
+            { "id": "hin_09", "name": "Bhed Aur Bhediye" },
+            { "id": "hin_10", "name": "Do Kalakaar" },
+            { "id": "hin_11", "name": "Sakhi" },
+            { "id": "hin_12", "name": "Girdhar Ki Kundaliyan" },
+            { "id": "hin_13", "name": "Swarg Bana Sakte Hain" },
+            { "id": "hin_14", "name": "Wah Janmbhoomi Meri" },
+            { "id": "hin_15", "name": "Megh Aaye" },
+            { "id": "hin_16", "name": "Sur Ke Pad" },
+            { "id": "hin_17", "name": "Vinay Ke Pad" },
+            { "id": "hin_18", "name": "Bhiksuk" },
+            { "id": "hin_18b", "name": "Chalna Hamara Kaam Hai" },
+            { "id": "hin_18c", "name": "Matru Mandir Ki Aur" },
             { "id": "hin_19", "name": "Sanskar aur Bhavna — Vishnu Prabhakar" },
             { "id": "hin_20", "name": "Bahu ki Vida — Vinod Rastogi" },
             {
@@ -187,13 +180,21 @@
               "name": "Mahabharat ki Ek Sanjh — Bharat Bhushan Agrawal"
             },
             { "id": "hin_24", "name": "Deepdan — Ram Kumar Verma" },
-            { "id": "hin_25", "name": "Nibandh / Anuched Lekhan" },
+            { "id": "hin_25", "name": "Nibandh" },
             { "id": "hin_26", "name": "Patra Lekhan" },
             { "id": "hin_27", "name": "Apathit Gadyansh" },
-            {
-              "id": "hin_28",
-              "name": "Vyakaran (Sandhi, Samas, Muhavare, Vakya)"
-            }
+            { "id": "hin_28", "name": "Vilom Shabd" },
+            { "id": "hin_29", "name": "Paryayvachi Shabd" },
+            { "id": "hin_30", "name": "Kriya" },
+            { "id": "hin_31", "name": "Kaal" },
+            { "id": "hin_32", "name": "Vakya Parivartan" },
+            { "id": "hin_33", "name": "Visheshan" },
+            { "id": "hin_34", "name": "Bhavvachak Sangya" },
+            { "id": "hin_35", "name": "Muhavre" },
+            { "id": "hin_36", "name": "Lokoktiyan" },
+            { "id": "hin_37", "name": "Tatsam" },
+            { "id": "hin_38", "name": "Tatbhav" },
+            { "id": "hin_39", "name": "Anek Shabd Ke Liye Ek Shabd" }
           ]
         },
         "bengali": {
